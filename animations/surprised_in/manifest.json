@@ -1,0 +1,108 @@
+{
+  "canvas": {
+    "height": 560,
+    "width": 420
+  },
+  "emotion": "surprised_in",
+  "fps": 18,
+  "frameCount": 14,
+  "frames": [
+    {
+      "file": "0000.png",
+      "sha256": "1b5e271b7d5b975d924812185a8ed7d8fd977f937dc3c829e94926f82b2273c1"
+    },
+    {
+      "file": "0001.png",
+      "sha256": "ab7168f167e587fdff7b409a1adfa0d45770ddfbf191b0fb39b7f8537ea80fb3"
+    },
+    {
+      "file": "0002.png",
+      "sha256": "1fb1860896b38d38fdacc963c745cfa5e0c12bd35aea1e5ebf7c5be9fedf84aa"
+    },
+    {
+      "file": "0003.png",
+      "sha256": "1c1fc52240c40d990b7d32d28eb6551eb18b7d2884415dc2c11d62fe77128daf"
+    },
+    {
+      "file": "0004.png",
+      "sha256": "a5d65c6066da752b70ae7aed7c704410ea1e8018a53fd6ad1cb02b267b42bd70"
+    },
+    {
+      "file": "0005.png",
+      "sha256": "75ac0184fb0588f7a2e677c8ef788069bb106221b07684ae03def00ed4d5a902"
+    },
+    {
+      "file": "0006.png",
+      "sha256": "d18d89807c05d29e1d79491a1a6f8adf70acfa09679bb8e021420e038b7017cf"
+    },
+    {
+      "file": "0007.png",
+      "sha256": "0c6720258c1de0128eedf27d504b7da4abde00ba2235cbda7045eda527ccd621"
+    },
+    {
+      "file": "0008.png",
+      "sha256": "4b5d4ce7f7b46279badd1df3ef9825f77b16ad467ffcd5b69e4b8190d79a0e47"
+    },
+    {
+      "file": "0009.png",
+      "sha256": "05a0fb2fc422dd53cd7d254590d382a9874c076cf81f0d49647290122beefb6c"
+    },
+    {
+      "file": "0010.png",
+      "sha256": "61685ae9c912d76bbeba63f834d93a17a04457d7d9dc03cba2cd222f52ff62ab"
+    },
+    {
+      "file": "0011.png",
+      "sha256": "aec5941792f0436cbc409c3e3fd05eaedcb1ac12cc91758930de23fcd04f990d"
+    },
+    {
+      "file": "0012.png",
+      "sha256": "36b997d5f290128d26588234eb902d4a9ff12e545c1b998c5f69a50f14a94a8c"
+    },
+    {
+      "file": "0013.png",
+      "sha256": "6938e2b9c78962fa925a12e8db5373645358dc03d4ace2e72b47a45023f12233"
+    }
+  ],
+  "groundY": 540,
+  "issues": [],
+  "loop": false,
+  "mouthAnchor": {
+    "frame": 0,
+    "x": 192.72,
+    "y": 77
+  },
+  "mouthKeyframes": [
+    {
+      "frame": 0,
+      "x": 192.72,
+      "y": 77
+    },
+    {
+      "frame": 4,
+      "x": 184.29,
+      "y": 80.82
+    },
+    {
+      "frame": 8,
+      "x": 189.25,
+      "y": 78.71
+    },
+    {
+      "frame": 12,
+      "x": 196.38,
+      "y": 87.41
+    },
+    {
+      "frame": 13,
+      "x": 218.91,
+      "y": 78.74
+    }
+  ],
+  "name": "surprised_in",
+  "priority": 25,
+  "reviewed": true,
+  "sourceSha256": "bd33f866e694bd49702561c273106c95f21a85e9baa842a8065e28a9326e8e87",
+  "transitionIn": "",
+  "transitionOut": ""
+}
