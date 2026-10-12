@@ -1,0 +1,87 @@
+{
+  "name": "smug",
+  "emotion": "smug",
+  "fps": 18,
+  "frameCount": 10,
+  "loop": false,
+  "priority": 25,
+  "mouthAnchor": {
+    "frame": 0,
+    "x": 176.25,
+    "y": 81.12
+  },
+  "mouthKeyframes": [
+    {
+      "frame": 0,
+      "x": 176.25,
+      "y": 81.12
+    },
+    {
+      "frame": 3,
+      "x": 185.15,
+      "y": 67.81
+    },
+    {
+      "frame": 6,
+      "x": 188.04,
+      "y": 58.15
+    },
+    {
+      "frame": 9,
+      "x": 171.17,
+      "y": 136.03
+    }
+  ],
+  "transitionIn": "angry_in",
+  "transitionOut": "angry_out",
+  "canvas": {
+    "width": 420,
+    "height": 560
+  },
+  "groundY": 540,
+  "frames": [
+    {
+      "file": "0000.png",
+      "sha256": "349313fbab52018e3ead66f5949d09bde6d2e16495d5ad47fefb41ec1418b869"
+    },
+    {
+      "file": "0001.png",
+      "sha256": "5fe0ccba04ecc1b57a9b319356490a0022e8720c433258d31786836d8da34765"
+    },
+    {
+      "file": "0002.png",
+      "sha256": "8428c3651086bcd9a38e903faa80d9d5ce75aedae585719a62e61593b5b410c2"
+    },
+    {
+      "file": "0003.png",
+      "sha256": "e13807e3dbbec80825821d48c6ce13698a5451105a33a9376251c3ce863b9b7e"
+    },
+    {
+      "file": "0004.png",
+      "sha256": "b12af5f8a329303616475b08cfd77b15407fad7d96cc6ef1eed8725fbb2c64e2"
+    },
+    {
+      "file": "0005.png",
+      "sha256": "0d233873443f48b3b73a3046f9e28cfb47395b9281ce7f1b99ec203fc628bb4b"
+    },
+    {
+      "file": "0006.png",
+      "sha256": "88ffb4fa240e635129c8bd4665bc9e7465a97df88bb430952862380b63fc2bfd"
+    },
+    {
+      "file": "0007.png",
+      "sha256": "a5e39abc897b6683db9cbdd808e2f1bac5f9a7c339571511d7f01d82baf4ce71"
+    },
+    {
+      "file": "0008.png",
+      "sha256": "d5471bc4fb8d36c043358f3c7042193157cd6c800e8d86eeda755ff3131b0b31"
+    },
+    {
+      "file": "0009.png",
+      "sha256": "9edd188610cb3b07244dc15873ac22028d222c44135ee977fae401f6a9a8e6fc"
+    }
+  ],
+  "reviewed": true,
+  "sourceSha256": "32c3647895d843eb0f7916fccac07376961336ee6a2123b9dca4223d6a8f7e47",
+  "issues": []
+}

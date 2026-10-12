@@ -1,0 +1,87 @@
+{
+  "name": "cheer",
+  "emotion": "cheer",
+  "fps": 24,
+  "frameCount": 10,
+  "loop": false,
+  "priority": 25,
+  "mouthAnchor": {
+    "frame": 0,
+    "x": 240.27,
+    "y": 101.85
+  },
+  "mouthKeyframes": [
+    {
+      "frame": 0,
+      "x": 240.27,
+      "y": 101.85
+    },
+    {
+      "frame": 3,
+      "x": 238.99,
+      "y": 102.65
+    },
+    {
+      "frame": 6,
+      "x": 239.27,
+      "y": 101.8
+    },
+    {
+      "frame": 9,
+      "x": 238.53,
+      "y": 102.95
+    }
+  ],
+  "transitionIn": "surprised_in",
+  "transitionOut": "surprised_out",
+  "canvas": {
+    "width": 420,
+    "height": 560
+  },
+  "groundY": 540,
+  "frames": [
+    {
+      "file": "0000.png",
+      "sha256": "5aec3de29e00409d546aa1e66accf9fa61db73389c11946265c9d5333b6a5ee3"
+    },
+    {
+      "file": "0001.png",
+      "sha256": "2e921b9c114a02c3b30f1ddc63f9e9b92e6128218531c4c85b13bd76190aef33"
+    },
+    {
+      "file": "0002.png",
+      "sha256": "d905fee19725d4483a06dbe9c17c392d859b77a2f3f2f738ba27608c381e7369"
+    },
+    {
+      "file": "0003.png",
+      "sha256": "77389b4b5964d0ee63d19d7c1bf745cb6b7243a66d54bcfaf3759718710ea28e"
+    },
+    {
+      "file": "0004.png",
+      "sha256": "dd2b074b8e13386d98b3f2102b8190427f434dcc906ad58d6f4911245cea58cc"
+    },
+    {
+      "file": "0005.png",
+      "sha256": "40fbd464ea5e39245ac7a9f89443c6cff2d488bbd37a0c8c0436731fe8e10801"
+    },
+    {
+      "file": "0006.png",
+      "sha256": "80f34f6c90debd1fa92bc56101e0fe9f3e6e3b0ce6103ead230e075d6a569a80"
+    },
+    {
+      "file": "0007.png",
+      "sha256": "8a5a937e67bbd066475a7096b808dcfd02fc2605a07b2060e68cfe89fe291c94"
+    },
+    {
+      "file": "0008.png",
+      "sha256": "241154eccce08e257927267520c0f633b2e08c2e4434529801971e0741804c08"
+    },
+    {
+      "file": "0009.png",
+      "sha256": "1c6e4d3f272e8d503800744517993797f30e774fe222ff960baa37ba5c8594a5"
+    }
+  ],
+  "reviewed": true,
+  "sourceSha256": "cc3cc156861f1c60b4a55eb369d490f58fd218d2dabd7c651a8072bb2ef53621",
+  "issues": []
+}

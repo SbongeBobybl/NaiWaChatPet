@@ -1,0 +1,87 @@
+{
+  "name": "hug",
+  "emotion": "hug",
+  "fps": 15,
+  "frameCount": 10,
+  "loop": false,
+  "priority": 25,
+  "mouthAnchor": {
+    "frame": 0,
+    "x": 203.56,
+    "y": 101.35
+  },
+  "mouthKeyframes": [
+    {
+      "frame": 0,
+      "x": 203.56,
+      "y": 101.35
+    },
+    {
+      "frame": 3,
+      "x": 203.59,
+      "y": 101.33
+    },
+    {
+      "frame": 6,
+      "x": 202.69,
+      "y": 100.94
+    },
+    {
+      "frame": 9,
+      "x": 199.88,
+      "y": 102.58
+    }
+  ],
+  "transitionIn": "shy_in",
+  "transitionOut": "shy_out",
+  "canvas": {
+    "width": 420,
+    "height": 560
+  },
+  "groundY": 540,
+  "frames": [
+    {
+      "file": "0000.png",
+      "sha256": "cfe1c93e216cfe1754082b0d7a676fe4c342d46a8f9fea945a0084a046b15029"
+    },
+    {
+      "file": "0001.png",
+      "sha256": "8248e32f5c354f92f3d96f3e9a10061907cc90e1d52d2df73bcee8bfde414858"
+    },
+    {
+      "file": "0002.png",
+      "sha256": "fd0a551c47caa4ce87afb8baa6bc0bc843ff76817d8899d2854b7b0e8dfba613"
+    },
+    {
+      "file": "0003.png",
+      "sha256": "fe3cba48964baefb142ac641b55c8067a67e542cc083de9d18eac92c68e6d0c8"
+    },
+    {
+      "file": "0004.png",
+      "sha256": "80039d77aa976fb3affe3eb64b0463a0e98eb4c09d08add281b82cb4c1396c15"
+    },
+    {
+      "file": "0005.png",
+      "sha256": "6ad2bc493ff449e50714b15d45df2b4c87702beb707dcf98b600b6fcee04b702"
+    },
+    {
+      "file": "0006.png",
+      "sha256": "276609fdffc058bc31138ae276469e0e75d45e716bfdd69e6228d2b94c24c7a1"
+    },
+    {
+      "file": "0007.png",
+      "sha256": "4f94a97ff902eac6eda5866fc6ad3f81be1cd5c758829118af4bdf4f1dfe47c5"
+    },
+    {
+      "file": "0008.png",
+      "sha256": "b149392ff4a3921c1da28d4ae3d589392b78d4f2693098513dd3cb4df87bc5bc"
+    },
+    {
+      "file": "0009.png",
+      "sha256": "bf58126b6fe18ef2868b7e4dc6286efc41026c44e2345e967e95669ccb871111"
+    }
+  ],
+  "reviewed": true,
+  "sourceSha256": "19d3292cbb8f00e5eaa081ccbd3276aba9697434d8f87597c14d45382d113190",
+  "issues": []
+}

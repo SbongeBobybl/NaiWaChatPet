@@ -1,0 +1,87 @@
+{
+  "name": "love",
+  "emotion": "love",
+  "fps": 18,
+  "frameCount": 10,
+  "loop": false,
+  "priority": 25,
+  "mouthAnchor": {
+    "frame": 0,
+    "x": 216.05,
+    "y": 78.02
+  },
+  "mouthKeyframes": [
+    {
+      "frame": 0,
+      "x": 216.05,
+      "y": 78.02
+    },
+    {
+      "frame": 3,
+      "x": 215.27,
+      "y": 80.49
+    },
+    {
+      "frame": 6,
+      "x": 205.72,
+      "y": 96.65
+    },
+    {
+      "frame": 9,
+      "x": 203.63,
+      "y": 101.44
+    }
+  ],
+  "transitionIn": "shy_in",
+  "transitionOut": "shy_out",
+  "canvas": {
+    "width": 420,
+    "height": 560
+  },
+  "groundY": 540,
+  "frames": [
+    {
+      "file": "0000.png",
+      "sha256": "d23e41ad0a1666e409982dcf93baf806e4393e807438eb1ca3474127ac404f87"
+    },
+    {
+      "file": "0001.png",
+      "sha256": "4611156f2c5070785ff04b758574a43c15b55242bcb06b28ccc6bab78a113dc1"
+    },
+    {
+      "file": "0002.png",
+      "sha256": "d9a2abfc4bd0abe14e5181a95f0c4a97fc010a7d2c4f3ec8b42dac35954c4ab7"
+    },
+    {
+      "file": "0003.png",
+      "sha256": "8daa9cbe67d15f0073c08e9d212c1be26058a2fba4062ba47c7eacb45b481216"
+    },
+    {
+      "file": "0004.png",
+      "sha256": "beaaeafa9c56561b3e483965c30acb58eb258971d6b9165a1c8c0549b8a8f14d"
+    },
+    {
+      "file": "0005.png",
+      "sha256": "6a081c816255bbd6ccd55b24f6dbb6bf6c5a89fcd7331bf054de245da4323dd5"
+    },
+    {
+      "file": "0006.png",
+      "sha256": "24553659c8b60306fd6635bba31b0667aa30ed0a59efae1938a6dcd6e110cdb5"
+    },
+    {
+      "file": "0007.png",
+      "sha256": "c1ad4c5ddcbc999c0b04d07f8520355d70d58de7769f3c03793aea881c7598fa"
+    },
+    {
+      "file": "0008.png",
+      "sha256": "622e0b0e838d41d264f33a96c3ac615a9643ae8b937ae1d60fda84842798df9d"
+    },
+    {
+      "file": "0009.png",
+      "sha256": "851dcae4046ec26cb79c4e33077e908e1694aeaf82705a13a46ef627a562bf19"
+    }
+  ],
+  "reviewed": true,
+  "sourceSha256": "b77fde3fa1050c1de4552d7ff31b6e8a6e827ab64553f8f80581d40d2e5e795c",
+  "issues": []
+}

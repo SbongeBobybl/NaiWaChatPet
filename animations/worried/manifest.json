@@ -1,0 +1,87 @@
+{
+  "name": "worried",
+  "emotion": "worried",
+  "fps": 18,
+  "frameCount": 10,
+  "loop": false,
+  "priority": 25,
+  "mouthAnchor": {
+    "frame": 0,
+    "x": 230.68,
+    "y": 95.55
+  },
+  "mouthKeyframes": [
+    {
+      "frame": 0,
+      "x": 230.68,
+      "y": 95.55
+    },
+    {
+      "frame": 3,
+      "x": 229.16,
+      "y": 100.56
+    },
+    {
+      "frame": 6,
+      "x": 229.01,
+      "y": 103.9
+    },
+    {
+      "frame": 9,
+      "x": 229.21,
+      "y": 105.78
+    }
+  ],
+  "transitionIn": "sad_in",
+  "transitionOut": "sad_out",
+  "canvas": {
+    "width": 420,
+    "height": 560
+  },
+  "groundY": 540,
+  "frames": [
+    {
+      "file": "0000.png",
+      "sha256": "8d735e08310794ee94b2f42fb843697d7d942028fa6cf87a4e81a539836f994e"
+    },
+    {
+      "file": "0001.png",
+      "sha256": "a744ba72032afd6f35c42a69c54abc995232c0754ac927e48fd1a5c4a91ceafa"
+    },
+    {
+      "file": "0002.png",
+      "sha256": "ba7293603ffb3b129d33155f0230d05088e6140a9f54d8102c3887dcca6216e5"
+    },
+    {
+      "file": "0003.png",
+      "sha256": "9de9e26bb5e3df83af28c46d8f5b2174be249b84da502498df56048fa796e4ca"
+    },
+    {
+      "file": "0004.png",
+      "sha256": "fdebf945fa6d812f1ce340a6d0f18243d1a7a3385be53fe4afbeed22abb19e24"
+    },
+    {
+      "file": "0005.png",
+      "sha256": "0499dd71eea719e6d38d3d54a64e9d942451b067fdd9edcb1c5b7d49ca1d0a47"
+    },
+    {
+      "file": "0006.png",
+      "sha256": "72dcb92e3ab7b56fb613765bc36166dcec8b698bc81eb8a146ebdcc7fa5fde39"
+    },
+    {
+      "file": "0007.png",
+      "sha256": "e445c8756eb0b212b30f439bc904796712e0ed11590f698c76c24c4a3034fa23"
+    },
+    {
+      "file": "0008.png",
+      "sha256": "c46e903daf25d3f4bb1fa4e29d189851685b3b081f603194b87f8f0eb4ebecdb"
+    },
+    {
+      "file": "0009.png",
+      "sha256": "936d22cd9681eca2ab8eb79b809ce5f022fb5f10f2a2b4bd117c832bd7199d1a"
+    }
+  ],
+  "reviewed": true,
+  "sourceSha256": "034a92415645981327eaf97bfe460bc7f15866e0fd20788fb4e6fbab7911185a",
+  "issues": []
+}

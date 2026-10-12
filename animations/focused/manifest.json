@@ -1,0 +1,87 @@
+{
+  "name": "focused",
+  "emotion": "focused",
+  "fps": 12,
+  "frameCount": 10,
+  "loop": false,
+  "priority": 25,
+  "mouthAnchor": {
+    "frame": 0,
+    "x": 224.02,
+    "y": 93.95
+  },
+  "mouthKeyframes": [
+    {
+      "frame": 0,
+      "x": 224.02,
+      "y": 93.95
+    },
+    {
+      "frame": 3,
+      "x": 218.53,
+      "y": 123.25
+    },
+    {
+      "frame": 6,
+      "x": 216.03,
+      "y": 130.32
+    },
+    {
+      "frame": 9,
+      "x": 215.47,
+      "y": 128.2
+    }
+  ],
+  "transitionIn": "confused_in",
+  "transitionOut": "confused_out",
+  "canvas": {
+    "width": 420,
+    "height": 560
+  },
+  "groundY": 540,
+  "frames": [
+    {
+      "file": "0000.png",
+      "sha256": "941de335af6fc5aee8f7436517f78326b58f0ce7ecd53320975d38418a3d089d"
+    },
+    {
+      "file": "0001.png",
+      "sha256": "f956cbb99e13cde30fc62376c79b2cf7fbbab74b981b4fb5ec89aa64a51bc28d"
+    },
+    {
+      "file": "0002.png",
+      "sha256": "afd1036c166128ab74d0ba3397c27a1c708fd4e1177adde41b3984bd52cc22a9"
+    },
+    {
+      "file": "0003.png",
+      "sha256": "5dcba873ef9c795631c2df19c6b959c6a5003201b98b024bb06c4d4413cba190"
+    },
+    {
+      "file": "0004.png",
+      "sha256": "7a9401fd275aaca0e77aa5b7f58097c50ca4c97120b3f7e14a9dbc3c9d68b1fe"
+    },
+    {
+      "file": "0005.png",
+      "sha256": "1b6ab818d33aec72a0a20b815355798c04799ab98545f46fa993e9175d9201bc"
+    },
+    {
+      "file": "0006.png",
+      "sha256": "720e07c3611b9817da7355384fb47aa497c7c5bccd2e6e7a70281204f951a27f"
+    },
+    {
+      "file": "0007.png",
+      "sha256": "0d99c0c4e2d2db15a3f0e508a1343ec10604381c096fd8b03f7c566747372070"
+    },
+    {
+      "file": "0008.png",
+      "sha256": "2d6aa7f6b635fbd1d485688a61410825b31a72c16328c9ca7afbcbb2c027dc2c"
+    },
+    {
+      "file": "0009.png",
+      "sha256": "1e1449e586d7669f764c15c95a1db86df054460a5182d0b0d52b26af3df02f1b"
+    }
+  ],
+  "reviewed": true,
+  "sourceSha256": "686e1c499ad7d6ffe4ea929cbd0184d8d8314c8ac3b9d0692d3707b6c99d7745",
+  "issues": []
+}

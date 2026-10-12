@@ -1,0 +1,87 @@
+{
+  "name": "happy",
+  "emotion": "happy",
+  "fps": 24,
+  "frameCount": 10,
+  "loop": false,
+  "priority": 25,
+  "mouthAnchor": {
+    "frame": 0,
+    "x": 222.33,
+    "y": 76.55
+  },
+  "mouthKeyframes": [
+    {
+      "frame": 0,
+      "x": 222.33,
+      "y": 76.55
+    },
+    {
+      "frame": 3,
+      "x": 220.23,
+      "y": 101.78
+    },
+    {
+      "frame": 6,
+      "x": 232.93,
+      "y": 108.05
+    },
+    {
+      "frame": 9,
+      "x": 240.36,
+      "y": 101.44
+    }
+  ],
+  "transitionIn": "surprised_in",
+  "transitionOut": "surprised_out",
+  "canvas": {
+    "width": 420,
+    "height": 560
+  },
+  "groundY": 540,
+  "frames": [
+    {
+      "file": "0000.png",
+      "sha256": "1c877e0fb2775f8c24904bbad4dac75fbfc83009e7bc6f1c393110506c2b400e"
+    },
+    {
+      "file": "0001.png",
+      "sha256": "03c0ae455bd380d55ece66d5a7a885942ea38ec28d08e50d31fa8f664d91441e"
+    },
+    {
+      "file": "0002.png",
+      "sha256": "15e8a04de3af76c67da215fdcfaaf6f0786d287193d3e90021cbe830e7934de7"
+    },
+    {
+      "file": "0003.png",
+      "sha256": "f2d1a111637ee7a534c0a7af24e1441ae3136dfbc66dd7060f584a7e35b558f8"
+    },
+    {
+      "file": "0004.png",
+      "sha256": "806bf30381d5590156aaa6d55d27bef0182daa2effe192c87713ed9ff3d44347"
+    },
+    {
+      "file": "0005.png",
+      "sha256": "0c7274ce2c386af499f9985fa1e290b5831ddf09144f211b75ebc026dbfda667"
+    },
+    {
+      "file": "0006.png",
+      "sha256": "d3ad096fea1b39055e5445bb490d3d7b0f60370658cf0951dc29027bf71718c8"
+    },
+    {
+      "file": "0007.png",
+      "sha256": "474507813fe993a54e4e8b11f2e3017d15fae57137f44cd5209ffa21e02cecf4"
+    },
+    {
+      "file": "0008.png",
+      "sha256": "5a25b3e22ffe3b1c74e52eb859051d58f11127198d5a93e22fc0b7bf93a9b389"
+    },
+    {
+      "file": "0009.png",
+      "sha256": "e01affb4807632815b373e36d4faa2f83e26cbca44c426dbdc84bc8b9069cc65"
+    }
+  ],
+  "reviewed": true,
+  "sourceSha256": "1ee7ec620e302cc4b38ee75e6e5dac581f11733591dbe9b005960ee9650930dd",
+  "issues": []
+}

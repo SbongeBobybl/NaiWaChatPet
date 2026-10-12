@@ -1,0 +1,87 @@
+{
+  "name": "excited",
+  "emotion": "excited",
+  "fps": 24,
+  "frameCount": 10,
+  "loop": false,
+  "priority": 25,
+  "mouthAnchor": {
+    "frame": 0,
+    "x": 227.09,
+    "y": 114.44
+  },
+  "mouthKeyframes": [
+    {
+      "frame": 0,
+      "x": 227.09,
+      "y": 114.44
+    },
+    {
+      "frame": 3,
+      "x": 240.31,
+      "y": 101.64
+    },
+    {
+      "frame": 6,
+      "x": 239.03,
+      "y": 102.59
+    },
+    {
+      "frame": 9,
+      "x": 238.87,
+      "y": 101.75
+    }
+  ],
+  "transitionIn": "surprised_in",
+  "transitionOut": "surprised_out",
+  "canvas": {
+    "width": 420,
+    "height": 560
+  },
+  "groundY": 540,
+  "frames": [
+    {
+      "file": "0000.png",
+      "sha256": "0c7274ce2c386af499f9985fa1e290b5831ddf09144f211b75ebc026dbfda667"
+    },
+    {
+      "file": "0001.png",
+      "sha256": "2bc28598be4d6b9ad756f89ecf2d2a9055f77fd9d16367241da58eefc6fe6061"
+    },
+    {
+      "file": "0002.png",
+      "sha256": "5a25b3e22ffe3b1c74e52eb859051d58f11127198d5a93e22fc0b7bf93a9b389"
+    },
+    {
+      "file": "0003.png",
+      "sha256": "0b959498972ef758621b720f72ebec01e3f409de572b8898190cf9ac98607559"
+    },
+    {
+      "file": "0004.png",
+      "sha256": "2e921b9c114a02c3b30f1ddc63f9e9b92e6128218531c4c85b13bd76190aef33"
+    },
+    {
+      "file": "0005.png",
+      "sha256": "6538f8a6fbc2f03df76abd53380bcbe1fc05bd49c60ea8cffed00d8a3c302f8e"
+    },
+    {
+      "file": "0006.png",
+      "sha256": "dd2b074b8e13386d98b3f2102b8190427f434dcc906ad58d6f4911245cea58cc"
+    },
+    {
+      "file": "0007.png",
+      "sha256": "d3bfb97a24748e343653f57d0da48d2f71f1ce0a752ee8e47275bc6800b534dd"
+    },
+    {
+      "file": "0008.png",
+      "sha256": "8a5a937e67bbd066475a7096b808dcfd02fc2605a07b2060e68cfe89fe291c94"
+    },
+    {
+      "file": "0009.png",
+      "sha256": "1d66bcf6392122477e9a6924bde8ce7673197120127ba86424a4c33bda54a282"
+    }
+  ],
+  "reviewed": true,
+  "sourceSha256": "2205b39b1edf057aeef216c29298d4b813190d66e803240c102c3adafce1b980",
+  "issues": []
+}
