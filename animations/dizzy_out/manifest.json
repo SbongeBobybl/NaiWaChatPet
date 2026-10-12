@@ -2,29 +2,29 @@
   "name": "dizzy_out",
   "emotion": "dizzy_out",
   "fps": 12,
-  "frameCount": 4,
+  "frameCount": 3,
   "loop": false,
   "priority": 25,
   "mouthAnchor": {
     "frame": 0,
-    "x": 177.0,
-    "y": 173.3
+    "x": 153.5,
+    "y": 138.17
   },
   "mouthKeyframes": [
     {
       "frame": 0,
-      "x": 177.0,
-      "y": 173.3
+      "x": 153.5,
+      "y": 138.17
+    },
+    {
+      "frame": 1,
+      "x": 186.38,
+      "y": 141.36
     },
     {
       "frame": 2,
-      "x": 199.41,
-      "y": 170.85
-    },
-    {
-      "frame": 3,
-      "x": 209.69,
-      "y": 170.44
+      "x": 153.5,
+      "y": 138.17
     }
   ],
   "transitionIn": "",
@@ -37,22 +37,18 @@
   "frames": [
     {
       "file": "0000.png",
-      "sha256": "c0e3b988e8654de54c2f9c3eddb3b45a630138ef575573fa2058ce78fbb0a5c3"
+      "sha256": "cc055177b4847597a08443d299de01ef9973aa4758d012f8433733324bd0e3e2"
     },
     {
       "file": "0001.png",
-      "sha256": "dc60b096d96ec209934573661d79a730639638b5ecb9cb899ba523772988e7be"
+      "sha256": "382cdf6e372c29cbe856bf126f3f5f3750553511393e55f98895c75a80a12141"
     },
     {
       "file": "0002.png",
-      "sha256": "67c8a559f39f59bd97663b92026fb5be8181d048cde9253bdfcd49ef5c7d1fb1"
-    },
-    {
-      "file": "0003.png",
-      "sha256": "dd09e508c9477b7dbc15c8f4c04dab2e1b059ab61583c28acfd1d3c8501a6287"
+      "sha256": "cc055177b4847597a08443d299de01ef9973aa4758d012f8433733324bd0e3e2"
     }
   ],
   "reviewed": true,
-  "sourceSha256": "7f4bc8328056658ddae7e2530d8532fc029de71aea9406136820151eae59ccf8",
+  "sourceSha256": "fdbf30bb89a23a8f47a44f7534f125b5fff535ec66aec7dd3fb58fb75b6c8465",
   "issues": []
 }

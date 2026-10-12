@@ -2,29 +2,29 @@
   "name": "celebrate_in",
   "emotion": "celebrate_in",
   "fps": 12,
-  "frameCount": 4,
+  "frameCount": 3,
   "loop": false,
   "priority": 25,
   "mouthAnchor": {
     "frame": 0,
-    "x": 214.0,
-    "y": 169.25
+    "x": 153.5,
+    "y": 138.17
   },
   "mouthKeyframes": [
     {
       "frame": 0,
-      "x": 214.0,
-      "y": 169.25
+      "x": 153.5,
+      "y": 138.17
+    },
+    {
+      "frame": 1,
+      "x": 171.96,
+      "y": 143.43
     },
     {
       "frame": 2,
-      "x": 214.0,
-      "y": 163.21
-    },
-    {
-      "frame": 3,
-      "x": 214.0,
-      "y": 160.47
+      "x": 189.81,
+      "y": 149.53
     }
   ],
   "transitionIn": "",
@@ -37,22 +37,18 @@
   "frames": [
     {
       "file": "0000.png",
-      "sha256": "512b72b48f1c5f5c8c44908364c7eb08615b893ed59b22f365007212d58b35d4"
+      "sha256": "cc055177b4847597a08443d299de01ef9973aa4758d012f8433733324bd0e3e2"
     },
     {
       "file": "0001.png",
-      "sha256": "dc87e54fab55ddd38d4208e2ea6fcee0f597e99b9af7961f9321ddc9d4dbe398"
+      "sha256": "868b1241660c84b98a12d359d45d6e757831deaf28868b34104997796b85d94c"
     },
     {
       "file": "0002.png",
-      "sha256": "f9c90542bc9712793e3231d516837d42a2a68580769e9c3ab7ea842289fa4ea7"
-    },
-    {
-      "file": "0003.png",
-      "sha256": "53d55e51faafe2b7b10e49ed9e8ab9f862d91ead64d7eb88aa8877c0a1cf4169"
+      "sha256": "b651a99781105fc83e1f25cb9f8029fb2cea0b5f7ad831ea6319ac6073b31f4c"
     }
   ],
   "reviewed": true,
-  "sourceSha256": "de0a4d9751152c350ba6874b3dd265d6d03381024d30a0182c70208dec08a721",
+  "sourceSha256": "97ef528869af038fcaa25ff9a8f69ac3ed864ec7004ccc33a0200ab258243e80",
   "issues": []
 }

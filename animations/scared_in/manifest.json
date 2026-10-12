@@ -2,29 +2,29 @@
   "name": "scared_in",
   "emotion": "scared_in",
   "fps": 12,
-  "frameCount": 4,
+  "frameCount": 3,
   "loop": false,
   "priority": 25,
   "mouthAnchor": {
     "frame": 0,
-    "x": 214.0,
-    "y": 178.86
+    "x": 153.5,
+    "y": 138.17
   },
   "mouthKeyframes": [
     {
       "frame": 0,
-      "x": 214.0,
-      "y": 178.86
+      "x": 153.5,
+      "y": 138.17
+    },
+    {
+      "frame": 1,
+      "x": 152.39,
+      "y": 164.92
     },
     {
       "frame": 2,
-      "x": 214.0,
-      "y": 223.09
-    },
-    {
-      "frame": 3,
-      "x": 214.0,
-      "y": 243.26
+      "x": 151.27,
+      "y": 191.44
     }
   ],
   "transitionIn": "",
@@ -37,22 +37,18 @@
   "frames": [
     {
       "file": "0000.png",
-      "sha256": "8365e67deb8374f65ff6f3c694e3f04778e107a739094bd39e46ba152124e446"
+      "sha256": "cc055177b4847597a08443d299de01ef9973aa4758d012f8433733324bd0e3e2"
     },
     {
       "file": "0001.png",
-      "sha256": "c4130f391f1ee8c6975a622ddcc9166f5c1b2a206bd8de19763f92be43377f4a"
+      "sha256": "008a841adbb192f0d0bf25e69796dfcffd819565365248e6da7dcddbe9a05fcb"
     },
     {
       "file": "0002.png",
-      "sha256": "f5a126e8255d497bd31062b614414facaf0442534e45585883ec0d1aa295c2fc"
-    },
-    {
-      "file": "0003.png",
-      "sha256": "f270ebee46a51b619f1df5f1ccf2f6a42b2b0a8bec016592fc0633db3a926fec"
+      "sha256": "5baf0bfbaefcf75a1cc1e5690137da5204fbe3967ae68f79ce7aa7b9a13490de"
     }
   ],
   "reviewed": true,
-  "sourceSha256": "aaab61cfb87cc9c727818ff6d9884d8562816c5b21a156f291e4655c5cd425d6",
+  "sourceSha256": "4a6aff63539e778c5218e68099601f4fbff3fe39641c85de1e30f6d694e492ec",
   "issues": []
 }

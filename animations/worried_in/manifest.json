@@ -2,29 +2,29 @@
   "name": "worried_in",
   "emotion": "worried_in",
   "fps": 12,
-  "frameCount": 4,
+  "frameCount": 3,
   "loop": false,
   "priority": 25,
   "mouthAnchor": {
     "frame": 0,
-    "x": 214.0,
-    "y": 172.32
+    "x": 153.5,
+    "y": 138.17
   },
   "mouthKeyframes": [
     {
       "frame": 0,
-      "x": 214.0,
-      "y": 172.32
+      "x": 153.5,
+      "y": 138.17
+    },
+    {
+      "frame": 1,
+      "x": 153.5,
+      "y": 147.12
     },
     {
       "frame": 2,
-      "x": 214.0,
-      "y": 182.38
-    },
-    {
-      "frame": 3,
-      "x": 214.0,
-      "y": 186.96
+      "x": 153.5,
+      "y": 156.07
     }
   ],
   "transitionIn": "",
@@ -37,22 +37,18 @@
   "frames": [
     {
       "file": "0000.png",
-      "sha256": "90272bcdd973014aaddce48ddd092a51af367ae65f565da1454c7d97775a69ec"
+      "sha256": "cc055177b4847597a08443d299de01ef9973aa4758d012f8433733324bd0e3e2"
     },
     {
       "file": "0001.png",
-      "sha256": "0a4970d8294a0b856306fe3b67f1752e47e104495c080b2cfe7a773f181a4618"
+      "sha256": "9211d52d2f4247d1a1c20d2d796722ae7b1168e33165dd0d988a54564b55959f"
     },
     {
       "file": "0002.png",
-      "sha256": "a3acb5e44bef3b33c8df29cc7118720f9d021333b12c36f92c0d3a6279f01363"
-    },
-    {
-      "file": "0003.png",
-      "sha256": "39383896f3b402870d508124c49970761b6b52a2abdbcff15089ed0b6c438ca6"
+      "sha256": "f93127794e887930ea24b628f0c59fcf0be05286d0e88cf3557dd4de625b032c"
     }
   ],
   "reviewed": true,
-  "sourceSha256": "cbc890c7f39ca11c2e5962bcc97be83ea0a6d23405552a5c805d26305c5e0864",
+  "sourceSha256": "9de6f54fff5ef5da7ee2ac3da72e56639ef38b26ff82fbe3ed7535ef5dd2c5c4",
   "issues": []
 }

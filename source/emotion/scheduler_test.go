@@ -306,6 +306,35 @@ func TestLegacyPlatesUnchanged(t *testing.T) {
 	}
 }
 
+func TestNewClipsOpenOnReference(t *testing.T) {
+	root := repoRoot(t)
+	ref, err := os.ReadFile(filepath.Join(root, "source", "emotion", "neutral-reference.png"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	sum := sha256.Sum256(ref)
+	want := hex.EncodeToString(sum[:])
+	ems, err := Catalog()
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, em := range ems {
+		if em.Legacy {
+			continue
+		}
+		for _, dir := range []string{em.ID, em.ID + "_in", em.ID + "_out"} {
+			b, err := os.ReadFile(filepath.Join(root, "animations", dir, "0000.png"))
+			if err != nil {
+				t.Fatalf("%s: %v", dir, err)
+			}
+			got := sha256.Sum256(b)
+			if hex.EncodeToString(got[:]) != want {
+				t.Fatalf("%s/0000.png is not the reference plate", dir)
+			}
+		}
+	}
+}
+
 func TestNewPerformancesAreNotLegacyCrops(t *testing.T) {
 	root := repoRoot(t)
 	ems, err := Catalog()

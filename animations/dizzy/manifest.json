@@ -2,29 +2,44 @@
   "name": "dizzy",
   "emotion": "dizzy",
   "fps": 12,
-  "frameCount": 8,
+  "frameCount": 6,
   "loop": false,
   "priority": 25,
   "mouthAnchor": {
     "frame": 0,
-    "x": 255.26,
-    "y": 174.01
+    "x": 153.5,
+    "y": 138.17
   },
   "mouthKeyframes": [
     {
       "frame": 0,
-      "x": 255.26,
-      "y": 174.01
+      "x": 153.5,
+      "y": 138.17
+    },
+    {
+      "frame": 1,
+      "x": 175.43,
+      "y": 139.97
+    },
+    {
+      "frame": 2,
+      "x": 197.3,
+      "y": 143.07
+    },
+    {
+      "frame": 3,
+      "x": 219.06,
+      "y": 147.47
     },
     {
       "frame": 4,
-      "x": 172.74,
-      "y": 174.01
+      "x": 219.06,
+      "y": 147.47
     },
     {
-      "frame": 7,
-      "x": 172.74,
-      "y": 174.01
+      "frame": 5,
+      "x": 219.06,
+      "y": 147.47
     }
   ],
   "transitionIn": "dizzy_in",
@@ -37,38 +52,30 @@
   "frames": [
     {
       "file": "0000.png",
-      "sha256": "fe15d6b0428904b775bd5a9171b18fe13c16323663a60a62f24d1a00c2eb69fe"
+      "sha256": "cc055177b4847597a08443d299de01ef9973aa4758d012f8433733324bd0e3e2"
     },
     {
       "file": "0001.png",
-      "sha256": "147693c72ad852efc4ad6d2783e19563b56f9c2dab0fefb65be9ef7cfd7d1c07"
+      "sha256": "7aada09b5d553e77417d8736b57cbc9d028533ab1c8359289a09c19edda9c638"
     },
     {
       "file": "0002.png",
-      "sha256": "c6eb61bbb1e89366e1d6448bde70140e0f4b9d02f60ce37d0361f53bb5faa239"
+      "sha256": "c93660f5362ca772d875430402aa233a3d762ba60d75f815622f80fa2d6d221b"
     },
     {
       "file": "0003.png",
-      "sha256": "5ebcaec8ef5596cc72f6e8261796779a447251e852dad824dd3460a5da45e736"
+      "sha256": "ec8436546eb0081308f472a74bcc5d67f53bb69f89921f85c95535f1d1277e5a"
     },
     {
       "file": "0004.png",
-      "sha256": "0f7cd5a37ac63753e22cd91b24fe41e34d2e94f7058884f19257e58f96c2dbd3"
+      "sha256": "ec8436546eb0081308f472a74bcc5d67f53bb69f89921f85c95535f1d1277e5a"
     },
     {
       "file": "0005.png",
-      "sha256": "0f7cd5a37ac63753e22cd91b24fe41e34d2e94f7058884f19257e58f96c2dbd3"
-    },
-    {
-      "file": "0006.png",
-      "sha256": "0f7cd5a37ac63753e22cd91b24fe41e34d2e94f7058884f19257e58f96c2dbd3"
-    },
-    {
-      "file": "0007.png",
-      "sha256": "0f7cd5a37ac63753e22cd91b24fe41e34d2e94f7058884f19257e58f96c2dbd3"
+      "sha256": "ec8436546eb0081308f472a74bcc5d67f53bb69f89921f85c95535f1d1277e5a"
     }
   ],
   "reviewed": true,
-  "sourceSha256": "1ba9c1b18b2b626dddb986aed388ba7ae41d49fe588e8f617e858d80055aacfa",
+  "sourceSha256": "6b80307d0e72368f8338e51df976bfba5711cfc640ba731cc67cc2a7974c4215",
   "issues": []
 }

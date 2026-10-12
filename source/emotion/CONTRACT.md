@@ -2,7 +2,7 @@
 
 Locomotion owns the body: idle, walk, run, jump, and attack, including displacement and facing. Emotion is a facial/upper overlay. The two tracks do not share one exclusive animator clip slot.
 
-The legacy desktop player still draws full-character PNG plates from `animations/`. Legacy emotions keep their original plates and transitions (`angry`, `confused`, `sad`, `shy`, `surprised`, plus the embedded happy laugh). Every other emotion is an original performance from `tools/render_emotions.py`: a soft-shaded pear mascot on its own skeleton, with its own eyes, mouth, and motion arc. Those frames are not crops, reverses, or renames of the legacy plates. Each new clip has its own `*_in` and `*_out`. Feet stay on the ground line. The scheduler does not add root motion.
+The legacy desktop player still draws full-character PNG plates from `animations/`. Legacy emotions keep their original plates and transitions (`angry`, `confused`, `sad`, `shy`, `surprised`, plus the embedded happy laugh). Every other emotion is a 2D warp of `source/emotion/reference-neutral.jpg` by `tools/render_emotions.py`. Frame 0 of each new clip (`animations/<id>`, `<id>_in`, `<id>_out`) is `source/emotion/neutral-reference.png`, that photo scaled onto the 420×560 plate. Later frames keep those pixels: the body squashes, leans, and nods, and the eye, mouth, blush, and tears are painted with colors taken from the photo. They are not crops, reverses, or renames of the legacy plates, and they are not a newly shaded character. Each new clip has its own `*_in` and `*_out`. Feet stay on the ground line. The scheduler does not add root motion.
 
 ## Entry points
 

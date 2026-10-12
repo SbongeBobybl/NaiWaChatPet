@@ -1,12 +1,13 @@
 #!/usr/bin/env python3
-"""Render original NaiWa emotion performances.
+"""Build new emotion plates from the attached NaiWa reference photo.
 
-Each new emotion is a soft-shaded 3D pear mascot posed on its own skeleton:
-different arms, body arc, eyes, and mouth. Frames are painted here. They are
-not windows, reverses, or renames of the legacy angry/sad/shy/surprised/confused
-plates. Legacy directories are never written.
+Frame 0 of every new clip is the canonical plate: that photo, uniformly
+scaled onto the 420x560 animation canvas. Later frames keep those pixels.
+The body squashes, leans, and nods, and the eye, mouth, blush, and tears
+are painted with colors taken from the photo. Nothing here is a new shaded
+character, and nothing is a crop of the legacy plates.
 
-The character stays planted on groundY. Lean and squash are pose, not travel.
+Legacy directories are never written.
 """
 
 from __future__ import annotations
@@ -19,137 +20,507 @@ import sys
 from pathlib import Path
 
 import numpy as np
-from PIL import Image, ImageDraw
+from PIL import Image, ImageDraw, ImageFilter
 
 ROOT = Path(__file__).resolve().parents[1]
 ANIM = ROOT / "animations"
 CATALOG_PATH = ROOT / "source" / "emotion" / "emotions.json"
 CONTRACT_PATH = ROOT / "source" / "emotion" / "CONTRACT.md"
+REF_JPG = ROOT / "source" / "emotion" / "reference-neutral.jpg"
+CANON_PNG = ROOT / "source" / "emotion" / "neutral-reference.png"
 
 W, H = 420, 560
-CX = 214.0
-GROUND = 540.0
-# Shrink slightly so raised arms stay inside the plate. Legacy bodies fill the
-# frame; these performances need headroom above the pear.
-GLOBAL_SCALE = 0.88
-PIVOT_REST = 390.0
+GROUND = 540
 SAFE_BUDGET = 125 * 1024 * 1024
-
-# Key light from the upper right, y axis points down.
-LX, LY, LZ = 0.42, -0.58, 0.70
-_LL = math.sqrt(LX * LX + LY * LY + LZ * LZ)
-LX, LY, LZ = LX / _LL, LY / _LL, LZ / _LL
-
-YELLOW = np.array([0.98, 0.78, 0.20], np.float32)
-YELLOW_SH = np.array([0.62, 0.34, 0.06], np.float32)
-BELLY = np.array([0.99, 0.90, 0.62], np.float32)
-HAND = np.array([0.80, 0.55, 0.24], np.float32)
-GREEN = np.array([0.42, 0.73, 0.38], np.float32)
-GREEN_DK = np.array([0.16, 0.38, 0.18], np.float32)
-WHITE = np.array([0.97, 0.98, 0.96], np.float32)
-PINK = np.array([1.0, 0.42, 0.48], np.float32)
-BROW = np.array([0.45, 0.24, 0.08], np.float32)
-TEAR = np.array([0.75, 0.90, 1.0], np.float32)
-
-# Rest-pose body ellipses: dx from CX, canvas y, rx, ry.
-BODY = (
-    (0.0, 98.0, 58.0, 52.0),
-    (0.0, 188.0, 84.0, 64.0),
-    (0.0, 278.0, 108.0, 90.0),
-    (0.0, 368.0, 76.0, 64.0),
-)
-BELLY_E = (0.0, 292.0, 70.0, 58.0)
-HEAD_Y = 98.0
-SHOULDER_Y = 200.0
-SHOULDER_X = 70.0
-UPPER_LEN = 78.0
-FORE_LEN = 70.0
-
-N_IN, N_MAIN, N_OUT = 4, 8, 4
+N_IN, N_MAIN, N_OUT = 3, 6, 3
 FPS = 12
+CROP = (4, 2, 818, 1192)
 
 
-def clamp(v, lo, hi):
-    return lo if v < lo else hi if v > hi else v
+def build_canonical():
+    src = Image.open(REF_JPG).convert("RGB").crop(CROP)
+    arr = np.asarray(src)
+    white = (arr[:, :, 0] > 250) & (arr[:, :, 1] > 250) & (arr[:, :, 2] > 250)
+    ys, xs = np.where(~white)
+    pad = 8
+    x0 = max(0, int(xs.min()) - pad)
+    y0 = max(0, int(ys.min()) - pad)
+    x1 = min(arr.shape[1], int(xs.max()) + pad + 1)
+    y1 = min(arr.shape[0], int(ys.max()) + pad + 1)
+    cropped = src.crop((x0, y0, x1, y1))
+    target_h = 512
+    scale = target_h / cropped.height
+    target_w = max(1, int(round(cropped.width * scale)))
+    if target_w > 400:
+        target_w = 400
+        scale = target_w / cropped.width
+        target_h = max(1, int(round(cropped.height * scale)))
+    resized = cropped.resize((target_w, target_h), Image.Resampling.LANCZOS)
+    canvas = Image.new("RGBA", (W, H), (0, 0, 0, 0))
+    ox = (W - target_w) // 2
+    oy = GROUND - target_h
+    canvas.paste(resized, (ox, oy))
+    rgba = np.array(canvas).astype(np.float32)
+    rgb = rgba[:, :, :3]
+    dist = 255.0 - rgb.min(axis=2)
+    backdrop = (rgba[:, :, 3] > 0) & (dist < 14.0)
+    rgba[:, :, 3] = np.where(backdrop, 0.0, rgba[:, :, 3])
+    soft = (rgba[:, :, 3] > 0) & (dist < 28.0)
+    rgba[:, :, 3] = np.where(soft, np.clip((dist - 14.0) * 18.0, 0.0, 255.0), rgba[:, :, 3])
+    out = Image.fromarray(rgba.astype(np.uint8), "RGBA")
+    CANON_PNG.parent.mkdir(parents=True, exist_ok=True)
+    out.save(CANON_PNG, format="PNG", optimize=True, compress_level=9)
+    return out
 
 
-def _scales(pose):
-    squash = max(float(pose["squash"]), 0.35)
-    sq = squash * GLOBAL_SCALE
-    x_scale = GLOBAL_SCALE / math.sqrt(squash)
-    return sq, x_scale
+def find_anchors(rgba):
+    rgb = rgba[:, :, :3].astype(np.int16)
+    a = rgba[:, :, 3] > 40
+    r, g, b = rgb[:, :, 0], rgb[:, :, 1], rgb[:, :, 2]
+    h, w = a.shape
+    yy, xx = np.mgrid[0:h, 0:w]
+    ys, xs = np.where(a)
+    feet = int(ys.max())
+    top = int(ys.min())
+    green = a & (g > r + 12) & (g > 90) & (b > 40) & (g > b - 10) & (yy < top + 180)
+    gys, gxs = np.where(green)
+    if len(gxs) < 20:
+        raise SystemExit("reference eye was not found")
+    eye = (float(gxs.mean()), float(gys.mean()))
+    # The slit is the dark horizontal mark on the snout, below and in front of the eye.
+    slit = (
+        a
+        & (r < 90)
+        & (g < 60)
+        & (b < 50)
+        & (yy > eye[1] + 16)
+        & (yy < eye[1] + 36)
+        & (xx > eye[0] - 48)
+        & (xx < eye[0] + 8)
+    )
+    sys_, sxs = np.where(slit)
+    if len(sxs) < 8:
+        mouth = (eye[0] - 22.0, eye[1] + 24.0)
+    else:
+        mouth = (float(sxs.mean()), float(sys_.mean()))
+    body_cx = float(np.median(xs))
+    return {
+        "eye": eye,
+        "mouth": mouth,
+        "feet": float(feet),
+        "top": float(top),
+        "body_cx": body_cx,
+        "neck": float(eye[1] + 78),
+        "head": (body_cx, float(eye[1] + 40)),
+    }
 
 
-def forward_point(x, y, pose):
-    sq, x_scale = _scales(pose)
-    y1 = GROUND - (GROUND - y) * sq
-    x1 = CX + (x - CX) * x_scale
-    pivot = GROUND - (GROUND - PIVOT_REST) * sq
-    a = math.radians(float(pose["lean"]))
-    ca, sa = math.cos(a), math.sin(a)
-    px, py = x1 - CX, y1 - pivot
-    return ca * px - sa * py + CX + float(pose["shift"]), sa * px + ca * py + pivot
+def dilate(mask, rad):
+    out = mask.copy()
+    ys, xs = np.where(mask)
+    h, w = mask.shape
+    for dy in range(-rad, rad + 1):
+        for dx in range(-rad, rad + 1):
+            if dx * dx + dy * dy > rad * rad:
+                continue
+            out[np.clip(ys + dy, 0, h - 1), np.clip(xs + dx, 0, w - 1)] = True
+    return out
 
 
-def inverse_grid(xs, ys, pose):
-    sq, x_scale = _scales(pose)
-    pivot = GROUND - (GROUND - PIVOT_REST) * sq
-    a = -math.radians(float(pose["lean"]))
-    ca, sa = math.cos(a), math.sin(a)
-    px = xs - CX - float(pose["shift"])
-    py = ys - pivot
-    x1 = ca * px - sa * py + CX
-    y1 = sa * px + ca * py + pivot
-    x = CX + (x1 - CX) / x_scale
-    y = GROUND - (GROUND - y1) / sq
+def hand_hole(rgba):
+    rgb = rgba[:, :, :3].astype(np.float32)
+    s = rgb.sum(2)
+    a = rgba[:, :, 3]
+    yy, xx = np.mgrid[0:H, 0:W]
+    ref = np.full(H, 700.0)
+    for y in range(220, 450):
+        vals = s[y, 215:305][a[y, 215:305] > 200]
+        if len(vals):
+            ref[y] = float(np.median(vals))
+    roi = (xx >= 90) & (xx <= 200) & (yy >= 258) & (yy <= 338) & (a > 150)
+    roi &= ~((xx > 182) & (yy > 314))
+    core = (
+        roi
+        & (s < ref[yy] - 70)
+        & (rgb[:, :, 2] + 6 < rgb[:, :, 1])
+        & (rgb[:, :, 1] < rgb[:, :, 0] + 14)
+        & (rgb[:, :, 0] < 220)
+    )
+    return dilate(core, 3) & (a > 40), core
+
+
+def fill_belly(rgba, hole):
+    """Continue each belly row across the hole so the shading stays in the photo."""
+    body = rgba.copy()
+    for y in range(H):
+        xs = np.where(hole[y])[0]
+        if len(xs) == 0:
+            continue
+        runs = []
+        start = prev = int(xs[0])
+        for x in map(int, xs[1:]):
+            if x > prev + 1:
+                runs.append((start, prev))
+                start = x
+            prev = x
+        runs.append((start, prev))
+        for a, b in runs:
+            left = a - 1
+            while left > 0 and (hole[y, left] or rgba[y, left, 3] < 80):
+                left -= 1
+            right = b + 1
+            while right < W - 1 and (hole[y, right] or rgba[y, right, 3] < 80):
+                right += 1
+            if rgba[y, left, 3] < 80 or rgba[y, right, 3] < 80 or right <= left:
+                continue
+            c0 = rgba[y, left, :3].astype(np.float32)
+            c1 = rgba[y, right, :3].astype(np.float32)
+            span = max(right - left, 1)
+            ts = np.arange(a, b + 1)
+            t = ((ts - left) / span)[:, None]
+            body[y, ts, :3] = np.clip(c0 * (1 - t) + c1 * t, 0, 255)
+            body[y, ts, 3] = 255
+    blur = np.array(Image.fromarray(body).filter(ImageFilter.GaussianBlur(0.7)))
+    body[hole] = blur[hole]
+    return body
+
+
+def sprite_from_mask(rgba, mask):
+    ys, xs = np.where(mask)
+    if len(xs) < 30:
+        raise SystemExit("hand sprite is empty")
+    xa, ya = int(xs.min()), int(ys.min())
+    xb, yb = int(xs.max()) + 1, int(ys.max()) + 1
+    sp = rgba[ya:yb, xa:xb].copy()
+    sm = mask[ya:yb, xa:xb]
+    af = np.array(Image.fromarray((sm.astype(np.uint8) * 255)).filter(ImageFilter.GaussianBlur(1.3)))
+    sp[:, :, 3] = np.where(af < 24, 0, np.minimum(sp[:, :, 3], af))
+    return sp, float(xs.mean()), float(ys.mean())
+
+
+def components(mask):
+    from collections import deque
+
+    vis = np.zeros(mask.shape, np.int32)
+    found = []
+    cid = 0
+    ys, xs = np.where(mask)
+    for y, x in zip(ys.tolist(), xs.tolist()):
+        if vis[y, x]:
+            continue
+        cid += 1
+        q = deque([(y, x)])
+        vis[y, x] = cid
+        n = 0
+        while q:
+            cy, cx = q.popleft()
+            n += 1
+            for dy, dx in ((1, 0), (-1, 0), (0, 1), (0, -1)):
+                ny, nx = cy + dy, cx + dx
+                if 0 <= ny < H and 0 <= nx < W and mask[ny, nx] and vis[ny, nx] == 0:
+                    vis[ny, nx] = cid
+                    q.append((ny, nx))
+        if n > 40:
+            found.append((n, cid))
+    found.sort(reverse=True)
+    return vis, found
+
+
+def build_parts(canon_u8):
+    anchors = find_anchors(canon_u8)
+    hole, core = hand_hole(canon_u8)
+    body = fill_belly(canon_u8, hole)
+    # Dark mitten pixels only, so a moved hand does not carry a belly rectangle.
+    mask = core & (canon_u8[:, :, 3] > 80)
+    vis, found = components(mask)
+    if len(found) < 2:
+        raise SystemExit(f"expected two hands, found {len(found)}")
+    sprites = []
+    for _n, cid in found[:2]:
+        sprites.append(sprite_from_mask(canon_u8, vis == cid))
+    # Larger component is the mitten on the belly. Smaller is the side hand.
+    anchors["hands"] = [(sprites[0][1], sprites[0][2]), (sprites[1][1], sprites[1][2])]
+    eye = anchors["eye"]
+    patch = canon_u8[int(eye[1]) - 3 : int(eye[1]) + 4, int(eye[0]) + 16 : int(eye[0]) + 26, :3]
+    anchors["skin"] = np.median(patch.reshape(-1, 3), axis=0).astype(np.float32)
+    slit = canon_u8[int(anchors["mouth"][1]) - 1 : int(anchors["mouth"][1]) + 2, int(anchors["mouth"][0]) - 4 : int(anchors["mouth"][0]) + 5, :3]
+    dark = slit.reshape(-1, 3)
+    anchors["slit"] = np.median(dark, axis=0).astype(np.float32)
+    return {"canon": canon_u8, "body": body, "sprites": sprites, "anchors": anchors}
+
+
+def sample_rgba(img, sx, sy):
+    h, w = img.shape[:2]
+    sx = np.clip(sx, 0, w - 1.001)
+    sy = np.clip(sy, 0, h - 1.001)
+    x0 = np.floor(sx).astype(np.int32)
+    y0 = np.floor(sy).astype(np.int32)
+    x1 = np.clip(x0 + 1, 0, w - 1)
+    y1 = np.clip(y0 + 1, 0, h - 1)
+    fx = (sx - x0)[..., None]
+    fy = (sy - y0)[..., None]
+    ia = img[y0, x0].astype(np.float32)
+    ib = img[y0, x1].astype(np.float32)
+    ic = img[y1, x0].astype(np.float32)
+    id_ = img[y1, x1].astype(np.float32)
+    return ia * (1 - fx) * (1 - fy) + ib * fx * (1 - fy) + ic * (1 - fx) * fy + id_ * fx * fy
+
+
+def smooth_weight(y, neck):
+    band = 26.0
+    t = np.clip((neck + band - y) / band, 0.0, 1.0)
+    return t * t * (3.0 - 2.0 * t)
+
+
+def inverse_xy(xx, yy, p, anchors):
+    feet = anchors["feet"]
+    cx = anchors["body_cx"]
+    squash = max(float(p["squash"]), 0.45)
+    widen = max(float(p["widen"]), 0.45)
+    sx = xx - float(p["shift"])
+    sy = yy
+    lean = math.radians(float(p["lean"]))
+    ca, sa = math.cos(-lean), math.sin(-lean)
+    dx, dy = sx - cx, sy - feet
+    sx = ca * dx - sa * dy + cx
+    sy = sa * dx + ca * dy + feet
+    sx = cx + (sx - cx) / widen
+    sy = feet - (feet - sy) / squash
+    neck = anchors["neck"]
+    hx, hy = anchors["head"]
+    w = smooth_weight(sy, neck)
+    sy = sy - float(p["head_dy"]) * w
+    tilt = math.radians(-float(p["tilt"]))
+    if abs(float(p["tilt"])) > 0.05:
+        ca, sa = math.cos(tilt), math.sin(tilt)
+        dx, dy = sx - hx, sy - hy
+        rx = ca * dx - sa * dy + hx
+        ry = sa * dx + ca * dy + hy
+        sx = sx * (1 - w) + rx * w
+        sy = sy * (1 - w) + ry * w
+    return sx, sy
+
+
+def forward_point(x, y, p, anchors):
+    feet = anchors["feet"]
+    cx = anchors["body_cx"]
+    hx, hy = anchors["head"]
+    neck = anchors["neck"]
+    w = float(smooth_weight(np.array([y]), neck)[0])
+    y = y + float(p["head_dy"]) * w
+    tilt = math.radians(float(p["tilt"]))
+    if abs(tilt) > 1e-4:
+        ca, sa = math.cos(tilt), math.sin(tilt)
+        dx, dy = x - hx, y - hy
+        rx = ca * dx - sa * dy + hx
+        ry = sa * dx + ca * dy + hy
+        x = x * (1 - w) + rx * w
+        y = y * (1 - w) + ry * w
+    squash = float(p["squash"])
+    widen = float(p["widen"])
+    y = feet - (feet - y) * squash
+    x = cx + (x - cx) * widen
+    lean = math.radians(float(p["lean"]))
+    ca, sa = math.cos(lean), math.sin(lean)
+    dx, dy = x - cx, y - feet
+    x = ca * dx - sa * dy + cx
+    y = sa * dx + ca * dy + feet
+    x += float(p["shift"])
     return x, y
+
+
+def blend_disc(img, cx, cy, rx, ry, color, amount, y_gate=None):
+    if amount <= 0.01:
+        return
+    x0 = max(0, int(cx - rx * 3))
+    x1 = min(W, int(cx + rx * 3) + 1)
+    y0 = max(0, int(cy - ry * 3))
+    y1 = min(H, int(cy + ry * 3) + 1)
+    if x1 <= x0 or y1 <= y0:
+        return
+    yy, xx = np.mgrid[y0:y1, x0:x1]
+    fall = np.exp(-((xx - cx) ** 2) / (2 * rx * rx) - ((yy - cy) ** 2) / (2 * ry * ry))
+    if y_gate is not None:
+        fall *= y_gate(yy)
+    a = img[y0:y1, x0:x1, 3:4].astype(np.float32) / 255.0
+    cover = (fall * amount * (a[:, :, 0] > 0.45))[..., None]
+    rgb = img[y0:y1, x0:x1, :3].astype(np.float32)
+    img[y0:y1, x0:x1, :3] = np.clip(rgb * (1 - cover) + color * cover, 0, 255).astype(np.uint8)
+
+
+def cover_eye(out, cx, cy, radius, skin, lid_frac):
+    """Paint skin down over the eye. lid_frac 0 leaves it, 1 shuts it."""
+    if lid_frac <= 0.02:
+        return
+    rad = int(math.ceil(radius)) + 2
+    x0, x1 = max(0, int(cx) - rad), min(W, int(cx) + rad + 1)
+    y0, y1 = max(0, int(cy) - rad), min(H, int(cy) + rad + 1)
+    yy, xx = np.mgrid[y0:y1, x0:x1]
+    r = np.hypot(xx - cx, yy - cy)
+    lid_y = cy - radius + lid_frac * (radius * 2.15)
+    inside = (r < radius + 1.2) & (out[y0:y1, x0:x1, 3] > 160)
+    soft = np.clip((lid_y - yy) / 2.2, 0.0, 1.0) * np.clip((radius + 1.2 - r) / 2.0, 0.0, 1.0)
+    cover = (inside * soft)[..., None]
+    rgb = out[y0:y1, x0:x1, :3].astype(np.float32)
+    out[y0:y1, x0:x1, :3] = np.clip(rgb * (1 - cover) + skin * cover, 0, 255).astype(np.uint8)
+
+
+def paint_face(img, anchors, p):
+    out = img.copy()
+    ex, ey = anchors["eye"]
+    mx, my = anchors["mouth"]
+    skin = anchors["skin"]
+    slit = np.clip(anchors["slit"], 0, 255)
+    yy, xx = np.mgrid[0:H, 0:W]
+    eye_dx = float(p["eye_dx"])
+    eye_dy = float(p["eye_dy"])
+    eye_scale = float(p["eye_scale"])
+    lid = float(p["lid"])
+    big = abs(eye_scale - 1.0) > 0.12 or abs(eye_dx) > 2.0 or abs(eye_dy) > 2.0
+    if big:
+        r = np.hypot(xx - ex, yy - ey)
+        cover = np.clip((16.0 - r) / 2.4, 0, 1) * (out[:, :, 3] > 180)
+        rgb = out[:, :, :3].astype(np.float32)
+        out[:, :, :3] = np.clip(rgb * (1 - cover[..., None]) + skin * cover[..., None], 0, 255).astype(np.uint8)
+        if lid < 0.9:
+            rad = 16
+            x0, y0 = int(ex) - rad, int(ey) - rad
+            disc = img[y0 : y0 + rad * 2 + 1, x0 : x0 + rad * 2 + 1].copy()
+            local = np.hypot(np.arange(-rad, rad + 1)[None, :], np.arange(-rad, rad + 1)[:, None])
+            edge = np.clip((rad + 0.6 - local) * 90.0, 0, 255)
+            disc[:, :, 3] = np.minimum(disc[:, :, 3], edge.astype(np.uint8))
+            nw = max(3, int(round(disc.shape[1] * eye_scale)))
+            nh = max(3, int(round(disc.shape[0] * eye_scale)))
+            scaled = np.array(Image.fromarray(disc).resize((nw, nh), Image.Resampling.BICUBIC))
+            paste_rgba(out, scaled, ex + eye_dx, ey + eye_dy)
+        cover_eye(out, ex + eye_dx, ey + eye_dy, 15 * max(eye_scale, 0.5), skin, lid)
+    elif lid > 0.02:
+        cover_eye(out, ex, ey, 15.5, skin, lid)
+    if lid > 0.82:
+        blend_disc(out, ex + eye_dx, ey + eye_dy + 1.5, 8.5, 1.15, slit * 0.4, 0.95)
+
+    smile = float(p["smile"])
+    open_m = float(p["mouth_open"])
+    if abs(smile) > 0.04 or open_m > 0.04:
+        blend_disc(out, mx, my, 9.5, 2.4, skin, 1.0)
+        width = 16 + open_m * 4
+        # Positive smile lifts the corners. Image y grows downward.
+        arch = smile * 4.2
+        ink = np.minimum(slit * 0.75, 70)
+        for t in np.linspace(-1, 1, 9):
+            x = mx + t * width * 0.5
+            y = my + arch * (1 - t * t)
+            blend_disc(out, x, y, 1.35, 1.15, ink, 1.0)
+        if open_m > 0.15:
+            blend_disc(out, mx, my + 2.2, 3.2 + open_m * 2.0, 1.4 + open_m * 3.4, ink * 0.55, min(1.0, open_m))
+    blush = float(p["blush"])
+    if blush > 0.02:
+        cheek = np.exp(-((xx - (ex - 2)) ** 2) / (2 * 24 * 24) - ((yy - (ey + 26)) ** 2) / (2 * 16 * 16))
+        cheek += 0.65 * np.exp(-((xx - (ex + 14)) ** 2) / (2 * 16 * 16) - ((yy - (ey + 18)) ** 2) / (2 * 12 * 12))
+        yellow = (out[:, :, 0] > 150) & (out[:, :, 1] > 80) & (out[:, :, 2] + 15 < out[:, :, 0]) & (out[:, :, 3] > 180) & (yy < ey + 70) & (yy > ey - 10)
+        cover = (np.clip(cheek, 0, 1) * blush * yellow)[..., None]
+        pink = np.array([255.0, 150.0, 150.0], np.float32)
+        rgb = out[:, :, :3].astype(np.float32)
+        out[:, :, :3] = np.clip(rgb * (1 - 0.55 * cover) + pink * (0.55 * cover), 0, 255).astype(np.uint8)
+    tear = float(p["tear"])
+    if tear > 0.05:
+        drop = np.array([210.0, 228.0, 245.0], np.float32)
+        blend_disc(out, ex + 6, ey + 22, 3.2, 6.5, drop, tear)
+        if tear > 0.6:
+            blend_disc(out, ex + 2, ey + 36, 2.6, 5.5, drop, tear * 0.85)
+    brow = float(p["brow"])
+    if brow > 0.05:
+        blend_disc(out, ex + 2, ey - 16, 10, 1.6, slit * 0.45 + skin * 0.2, brow * 0.7)
+    return out
+
+
+def paste_rgba(dst, sprite, cx, cy):
+    h, w = sprite.shape[:2]
+    x = int(round(cx - w / 2.0))
+    y = int(round(cy - h / 2.0))
+    x0, y0 = max(0, x), max(0, y)
+    x1, y1 = min(W, x + w), min(H, y + h)
+    if x1 <= x0 or y1 <= y0:
+        return
+    src = sprite[y0 - y : y0 - y + (y1 - y0), x0 - x : x0 - x + (x1 - x0)].astype(np.float32)
+    d = dst[y0:y1, x0:x1].astype(np.float32)
+    sa = src[:, :, 3:4] / 255.0
+    da = d[:, :, 3:4] / 255.0
+    oa = sa + da * (1 - sa)
+    d[:, :, :3] = (src[:, :, :3] * sa + d[:, :, :3] * da * (1 - sa)) / np.maximum(oa, 1e-4)
+    d[:, :, 3:4] = oa * 255.0
+    dst[y0:y1, x0:x1] = np.clip(d, 0, 255).astype(np.uint8)
+
+
+def transform_sprite(sprite, scale, rot):
+    im = Image.fromarray(sprite)
+    if abs(rot) > 0.2:
+        im = im.rotate(rot, resample=Image.Resampling.BICUBIC, expand=True)
+    if abs(scale - 1.0) > 0.02:
+        nw = max(1, int(round(im.size[0] * scale)))
+        nh = max(1, int(round(im.size[1] * scale)))
+        im = im.resize((nw, nh), Image.Resampling.BICUBIC)
+    return np.array(im)
+
+
+def needs_hands(p):
+    # Lifting the mittens out of this photo leaves a flat patch in the belly
+    # shading, so the pose stays on the original pixels. Expression, squash,
+    # lean, and nod carry the emotion.
+    return False
+
+
+def render_pose(parts, p):
+    anchors = parts["anchors"]
+    base = parts["body"] if needs_hands(p) else parts["canon"]
+    painted = paint_face(base, anchors, p)
+    yy, xx = np.mgrid[0:H, 0:W].astype(np.float32)
+    sx, sy = inverse_xy(xx, yy, p, anchors)
+    warped = np.clip(sample_rgba(painted, sx, sy), 0, 255).astype(np.uint8)
+    if needs_hands(p):
+        for sprite, (dx_k, dy_k, rot_k, sc_k), (rx, ry) in (
+            (parts["sprites"][0][0], ("h0_dx", "h0_dy", "h0_rot", "h0_sc"), anchors["hands"][0]),
+            (parts["sprites"][1][0], ("h1_dx", "h1_dy", "h1_rot", "h1_sc"), anchors["hands"][1]),
+        ):
+            fx, fy = forward_point(rx, ry, p, anchors)
+            fx += float(p[dx_k])
+            fy += float(p[dy_k])
+            moved = abs(p[dx_k]) + abs(p[dy_k]) > 16
+            stamp = transform_sprite(sprite, float(p[sc_k]), float(p[rot_k]))
+            if moved:
+                shadow = stamp.copy()
+                shadow[:, :, :3] = 80
+                shadow[:, :, 3] = (shadow[:, :, 3].astype(np.float32) * 0.28).astype(np.uint8)
+                paste_rgba(warped, shadow, fx + 2, fy + 5)
+            paste_rgba(warped, stamp, fx, fy)
+    return warped
 
 
 def base_pose():
     return {
-        "lean": 0.0,
         "squash": 1.0,
+        "widen": 1.0,
+        "lean": 0.0,
         "shift": 0.0,
-        "face_dy": 0.0,
+        "head_dy": 0.0,
         "tilt": 0.0,
-        "l_ik": 0.0,
-        "l_raise": 16.0,
-        "l_bend": 18.0,
-        "l_tx": CX - 55.0,
-        "l_ty": 310.0,
-        "r_ik": 0.0,
-        "r_raise": 16.0,
-        "r_bend": 18.0,
-        "r_tx": CX + 55.0,
-        "r_ty": 310.0,
-        "l_spread": 52.0,
-        "r_spread": 52.0,
-        "l_knee": 4.0,
-        "r_knee": 4.0,
-        "l_lift": 0.0,
-        "r_lift": 0.0,
-        "lid": 0.08,
+        "h0_dx": 0.0,
+        "h0_dy": 0.0,
+        "h0_rot": 0.0,
+        "h0_sc": 1.0,
+        "h1_dx": 0.0,
+        "h1_dy": 0.0,
+        "h1_rot": 0.0,
+        "h1_sc": 1.0,
         "eye_scale": 1.0,
-        "look_x": 0.0,
-        "look_y": 0.0,
-        "eye": "green",
-        "brow_l": 6.0,
-        "brow_r": 6.0,
-        "blush": 0.05,
-        "tears": 0.0,
-        "sweat": 0.0,
-        "mouth": "smile",
-        "mouth_open": 0.15,
-        "l_hand": "open",
-        "r_hand": "open",
-        "l_back": 0.0,
-        "r_back": 0.0,
-        "hand_scale": 1.0,
-        "zzz": 0.0,
-        "hearts": 0.0,
-        "spark": 0.0,
-        "peek": 0.0,
-        "t": 0.0,
+        "eye_dx": 0.0,
+        "eye_dy": 0.0,
+        "smile": 0.0,
+        "mouth_open": 0.0,
+        "lid": 0.0,
+        "blush": 0.0,
+        "tear": 0.0,
+        "brow": 0.0,
     }
 
 
@@ -159,1051 +530,134 @@ def pose(**kw):
     return p
 
 
-def lerp_pose(a, b, t):
+def scale_pose(peak, t):
     out = {}
-    for key, av in a.items():
-        bv = b[key]
-        if isinstance(av, (int, float)) and isinstance(bv, (int, float)):
-            out[key] = av * (1.0 - t) + bv * t
-        else:
-            out[key] = av if t < 0.5 else bv
+    origin = base_pose()
+    for k, v in peak.items():
+        out[k] = origin[k] + (v - origin[k]) * t
     return out
 
 
-def smooth(t):
-    t = clamp(t, 0.0, 1.0)
-    return t * t * (3.0 - 2.0 * t)
-
-
-def pulse(t):
-    """0 at the loop ends, 1 at the mid frame."""
-    return (1.0 - math.cos(2.0 * math.pi * t)) * 0.5
-
-
-def fk_arm(side, raise_deg, bend_deg):
-    sign = -1.0 if side == "l" else 1.0
-    shoulder = (CX + sign * SHOULDER_X, SHOULDER_Y)
-    a = math.radians(raise_deg)
-    dx = sign * math.sin(a)
-    dy = math.cos(a)
-    elbow = (shoulder[0] + dx * UPPER_LEN, shoulder[1] + dy * UPPER_LEN)
-    theta = -sign * math.radians(bend_deg)
-    ca, sa = math.cos(theta), math.sin(theta)
-    fdx = ca * dx - sa * dy
-    fdy = sa * dx + ca * dy
-    hand = (elbow[0] + fdx * FORE_LEN, elbow[1] + fdy * FORE_LEN)
-    return shoulder, elbow, hand
-
-
-def ik_arm(side, target):
-    sign = -1.0 if side == "l" else 1.0
-    shoulder = (CX + sign * SHOULDER_X, SHOULDER_Y)
-    dx = target[0] - shoulder[0]
-    dy = target[1] - shoulder[1]
-    dist = math.hypot(dx, dy)
-    reach = UPPER_LEN + FORE_LEN - 2.0
-    dist = clamp(dist, 12.0, reach)
-    if math.hypot(dx, dy) < 1e-3:
-        ux, uy = sign, 1.0
-    else:
-        ux, uy = dx / math.hypot(dx, dy), dy / math.hypot(dx, dy)
-    tx = shoulder[0] + ux * dist
-    ty = shoulder[1] + uy * dist
-    cos_a = (dist * dist + UPPER_LEN * UPPER_LEN - FORE_LEN * FORE_LEN) / (2.0 * dist * UPPER_LEN)
-    cos_a = clamp(cos_a, -1.0, 1.0)
-    turn = math.acos(cos_a)
-    base = math.atan2(uy, ux)
-    # Elbows bend away from the torso.
-    elbow_ang = base - sign * turn
-    elbow = (
-        shoulder[0] + math.cos(elbow_ang) * UPPER_LEN,
-        shoulder[1] + math.sin(elbow_ang) * UPPER_LEN,
-    )
-    return shoulder, elbow, (tx, ty)
-
-
-def arm_rest(side, pose):
-    ik = pose["l_ik"] if side == "l" else pose["r_ik"]
-    if ik >= 0.5:
-        tx = pose["l_tx"] if side == "l" else pose["r_tx"]
-        ty = pose["l_ty"] if side == "l" else pose["r_ty"]
-        return ik_arm(side, (tx, ty))
-    raise_deg = pose["l_raise"] if side == "l" else pose["r_raise"]
-    bend = pose["l_bend"] if side == "l" else pose["r_bend"]
-    return fk_arm(side, raise_deg, bend)
-
-
-def leg_rest(side, pose):
-    sign = -1.0 if side == "l" else 1.0
-    spread = pose["l_spread"] if side == "l" else pose["r_spread"]
-    knee = pose["l_knee"] if side == "l" else pose["r_knee"]
-    lift = pose["l_lift"] if side == "l" else pose["r_lift"]
-    hip = (CX + sign * 32.0, 396.0)
-    kn = (CX + sign * (36.0 + knee * 0.55), 468.0 - knee * 0.2)
-    ankle = (CX + sign * spread, 518.0 - lift)
-    foot = (ankle[0] + sign * 6.0, 528.0 - lift)
-    return hip, kn, ankle, foot
-
-
-def shade(nx, ny, nz, base):
-    ndot = nx * LX + ny * LY + nz * LZ
-    wrap = np.clip(ndot * 0.55 + 0.45, 0.0, 1.0)
-    lit = wrap ** 0.9
-    if base.ndim == 1:
-        col = YELLOW_SH * (1.0 - lit)[..., None] + base * lit[..., None]
-    else:
-        shadow = np.empty_like(base)
-        shadow[:] = YELLOW_SH
-        col = shadow * (1.0 - lit)[..., None] + base * lit[..., None]
-    spec = np.clip(ndot, 0.0, 1.0) ** 16 * 0.28
-    rim = (1.0 - nz) ** 1.5 * 0.12
-    col = col + (spec + rim)[..., None]
-    return np.clip(col, 0.0, 1.0)
-
-
-class Canvas:
-    def __init__(self):
-        self.rgb = np.zeros((H, W, 3), np.float32)
-        self.a = np.zeros((H, W), np.float32)
-        self.z = np.full((H, W), -1e9, np.float32)
-        self.yy, self.xx = np.mgrid[0:H, 0:W].astype(np.float32)
-
-    def _write(self, y0, y1, x0, x1, mask, zz, col, alpha):
-        if y1 <= y0 or x1 <= x0:
-            return
-        zs = self.z[y0:y1, x0:x1]
-        sel = mask & (zz > zs) & (alpha > 0.01)
-        if not np.any(sel):
-            return
-        zs[sel] = zz[sel]
-        self.rgb[y0:y1, x0:x1][sel] = col[sel]
-        self.a[y0:y1, x0:x1][sel] = np.maximum(self.a[y0:y1, x0:x1][sel], alpha[sel])
-
-    def stamp_ellipse(self, cx, cy, rx, ry, zbase, base, angle=0.0, clip_below=None):
-        rx = max(rx, 0.8)
-        ry = max(ry, 0.8)
-        pad = max(rx, ry) + 3
-        x0 = max(0, int(cx - pad))
-        x1 = min(W, int(cx + pad) + 1)
-        y0 = max(0, int(cy - pad))
-        y1 = min(H, int(cy + pad) + 1)
-        if x1 <= x0 or y1 <= y0:
-            return
-        xs = self.xx[y0:y1, x0:x1]
-        ys = self.yy[y0:y1, x0:x1]
-        dx = xs - cx
-        dy = ys - cy
-        if abs(angle) > 0.01:
-            ca, sa = math.cos(angle), math.sin(angle)
-            lx = ca * dx + sa * dy
-            ly = -sa * dx + ca * dy
-        else:
-            lx, ly = dx, dy
-        px = lx / rx
-        py = ly / ry
-        k0 = np.sqrt(px * px + py * py + 1e-8)
-        sdf = (k0 - 1.0) * min(rx, ry)
-        mask = sdf < 1.2
-        if clip_below is not None:
-            mask = mask & (ys > clip_below)
-        e = np.clip(k0, 0.0, 1.0)
-        nz = np.sqrt(np.clip(1.0 - e * e, 0.0, 1.0))
-        gx = px / (k0 * rx)
-        gy = py / (k0 * ry)
-        if abs(angle) > 0.01:
-            ca, sa = math.cos(angle), math.sin(angle)
-            sgx = ca * gx - sa * gy
-            sgy = sa * gx + ca * gy
-            gx, gy = sgx, sgy
-        nlen = np.sqrt(gx * gx + gy * gy) + 1e-8
-        nx = gx / nlen * e
-        ny = gy / nlen * e
-        ln = np.sqrt(nx * nx + ny * ny + nz * nz) + 1e-8
-        col = shade(nx / ln, ny / ln, nz / ln, base)
-        alpha = np.clip(1.2 - sdf, 0.0, 1.0)
-        self._write(y0, y1, x0, x1, mask, zbase + nz, col, alpha)
-
-    def stamp_capsule(self, p0, p1, radius, zbase, base):
-        radius = max(radius, 0.8)
-        x0 = max(0, int(min(p0[0], p1[0]) - radius - 2))
-        x1 = min(W, int(max(p0[0], p1[0]) + radius) + 3)
-        y0 = max(0, int(min(p0[1], p1[1]) - radius - 2))
-        y1 = min(H, int(max(p0[1], p1[1]) + radius) + 3)
-        if x1 <= x0 or y1 <= y0:
-            return
-        xs = self.xx[y0:y1, x0:x1]
-        ys = self.yy[y0:y1, x0:x1]
-        vx = p1[0] - p0[0]
-        vy = p1[1] - p0[1]
-        l2 = vx * vx + vy * vy + 1e-6
-        t = np.clip(((xs - p0[0]) * vx + (ys - p0[1]) * vy) / l2, 0.0, 1.0)
-        cx = p0[0] + t * vx
-        cy = p0[1] + t * vy
-        dx = xs - cx
-        dy = ys - cy
-        d = np.sqrt(dx * dx + dy * dy) + 1e-6
-        e = d / radius
-        mask = e <= 1.15
-        ee = np.clip(e, 0.0, 1.0)
-        nz = np.sqrt(np.clip(1.0 - ee * ee, 0.0, 1.0))
-        nx = dx / radius
-        ny = dy / radius
-        ln = np.sqrt(nx * nx + ny * ny + nz * nz) + 1e-8
-        col = shade(nx / ln, ny / ln, nz / ln, base)
-        alpha = np.clip((1.15 - e) * radius, 0.0, 1.0)
-        self._write(y0, y1, x0, x1, mask, zbase + nz, col, alpha)
-
-    def paint_body(self, pose):
-        xs, ys = inverse_grid(self.xx, self.yy, pose)
-        x0, x1 = 20, W - 20
-        y0, y1 = 10, H - 4
-        xr = xs[y0:y1, x0:x1]
-        yr = ys[y0:y1, x0:x1]
-        k = 46.0
-        sdf = None
-        gx = gy = None
-        for dx, cy, rx, ry in BODY:
-            px = (xr - (CX + dx)) / rx
-            py = (yr - cy) / ry
-            k0 = np.sqrt(px * px + py * py + 1e-8)
-            s = (k0 - 1.0) * min(rx, ry)
-            ggx = px / (k0 * rx)
-            ggy = py / (k0 * ry)
-            if sdf is None:
-                sdf, gx, gy = s, ggx, ggy
-                continue
-            h = np.clip(0.5 + 0.5 * (s - sdf) / k, 0.0, 1.0)
-            sdf = s * (1.0 - h) + sdf * h - k * h * (1.0 - h)
-            gx = ggx * (1.0 - h) + gx * h
-            gy = ggy * (1.0 - h) + gy * h
-        mask = sdf < 1.3
-        # Map the rest-space normal through the pose scale so light stays stable.
-        e = np.clip(sdf / 72.0 + 1.0, 0.0, 1.0)
-        nz = np.sqrt(np.clip(1.0 - np.minimum(e, 1.0) ** 2, 0.0, 1.0))
-        nlen = np.sqrt(gx * gx + gy * gy) + 1e-8
-        nx = gx / nlen * np.minimum(e, 1.0)
-        ny = gy / nlen * np.minimum(e, 1.0)
-        ln = np.sqrt(nx * nx + ny * ny + nz * nz) + 1e-8
-        nx, ny, nz = nx / ln, ny / ln, nz / ln
-        bdx, bcy, brx, bry = BELLY_E
-        bel = ((xr - (CX + bdx)) / brx) ** 2 + ((yr - bcy) / bry) ** 2
-        belly_w = np.clip(1.15 - bel, 0.0, 1.0) ** 0.65
-        base = YELLOW * (1.0 - belly_w)[..., None] + BELLY * belly_w[..., None]
-        # Cheek blush in rest space.
-        blush = float(pose["blush"])
-        if blush > 0.01:
-            for s in (-1.0, 1.0):
-                cx = CX + s * 46.0
-                cy = 124.0 + float(pose["face_dy"])
-                be = ((xr - cx) / 22.0) ** 2 + ((yr - cy) / 14.0) ** 2
-                w = np.clip(1.0 - be, 0.0, 1.0) * blush * 0.85
-                base = base * (1.0 - w)[..., None] + PINK * w[..., None]
-        col = shade(nx, ny, nz, base)
-        alpha = np.clip(1.3 - sdf, 0.0, 1.0)
-        self._write(y0, y1, x0, x1, mask, 1.0 + nz, col, alpha)
-
-    def paint_limbs(self, pose):
-        for side in ("l", "r"):
-            hip, knee, ankle, foot = leg_rest(side, pose)
-            pts = [forward_point(*p, pose) for p in (hip, knee, ankle, foot)]
-            self.stamp_capsule(pts[0], pts[1], 20.0, 0.3, YELLOW)
-            self.stamp_capsule(pts[1], pts[2], 16.0, 0.35, YELLOW)
-            self.stamp_ellipse(pts[3][0], pts[3][1], 28.0, 13.0, 0.5, YELLOW)
-            sign = -1.0 if side == "l" else 1.0
-            for ox in (-12.0, 0.0, 12.0):
-                self.stamp_ellipse(pts[3][0] + sign * ox, pts[3][1] + 6.0, 7.0, 6.0, 0.6, YELLOW)
-            shoulder, elbow, hand = arm_rest(side, pose)
-            pts = [forward_point(*p, pose) for p in (shoulder, elbow, hand)]
-            back = pose["l_back"] if side == "l" else pose["r_back"]
-            z_arm = 0.15 if back > 0.5 else 2.2
-            self.stamp_capsule(pts[0], pts[1], 18.0, z_arm, YELLOW)
-            self.stamp_capsule(pts[1], pts[2], 15.0, z_arm + 0.2, YELLOW)
-            self.stamp_ellipse(pts[1][0], pts[1][1], 16.0, 16.0, z_arm + 0.15, YELLOW)
-            self.paint_hand(pts[1], pts[2], pose["l_hand"] if side == "l" else pose["r_hand"], side, pose)
-
-    def paint_hand(self, elbow, hand, style, side, pose):
-        hs = max(float(pose.get("hand_scale", 1.0)), 0.4)
-        dx = hand[0] - elbow[0]
-        dy = hand[1] - elbow[1]
-        length = math.hypot(dx, dy) + 1e-6
-        ux, uy = dx / length, dy / length
-        ang = math.atan2(uy, ux)
-        palm = (hand[0] + ux * 10.0 * hs, hand[1] + uy * 10.0 * hs)
-        self.stamp_ellipse(palm[0], palm[1], 16.0 * hs, 13.0 * hs, 3.2, HAND, angle=ang)
-        sign = -1.0 if side == "l" else 1.0
-        if style == "fist":
-            spreads = (-0.25, 0.0, 0.25)
-            flen = 7.0
-        elif style == "point":
-            spreads = (-0.45, -0.15, 0.15, 0.7)
-            flen = 8.0
-        elif style == "spread":
-            spreads = (-0.85, -0.28, 0.28, 0.85)
-            flen = 18.0
-        elif style == "together":
-            spreads = (-0.12, -0.04, 0.04, 0.12)
-            flen = 16.0
-        elif style == "thumb":
-            spreads = (-0.2, 0.05, 0.25)
-            flen = 6.0
-        else:
-            spreads = (-0.55, -0.18, 0.18, 0.55)
-            flen = 16.0
-        for i, sp in enumerate(spreads):
-            fa = ang + sp
-            this = 24.0 if style == "point" and i == len(spreads) - 1 else flen
-            this *= hs
-            tip = (palm[0] + math.cos(fa) * (12.0 * hs + this), palm[1] + math.sin(fa) * (12.0 * hs + this))
-            root = (palm[0] + math.cos(fa) * 8.0 * hs, palm[1] + math.sin(fa) * 8.0 * hs)
-            self.stamp_capsule(root, tip, 4.2 * hs, 3.5, HAND)
-        if style == "thumb":
-            ta = -math.pi / 2
-            tlen = 30.0 * hs
-            thick = 7.0 * hs
-        else:
-            ta = ang + sign * 1.15
-            tlen = 18.0 * hs
-            thick = 5.0 * hs
-        t_root = (palm[0] + math.cos(ta) * 4.0, palm[1] + math.sin(ta) * 4.0)
-        t_tip = (palm[0] + math.cos(ta) * tlen, palm[1] + math.sin(ta) * tlen)
-        self.stamp_capsule(t_root, t_tip, thick, 3.8, HAND)
-
-    def paint_eyes(self, pose, centers):
-        style = pose["eye"]
-        scale = float(pose["eye_scale"])
-        lid = float(pose["lid"])
-        for i, (cx, cy) in enumerate(centers):
-            this_lid = lid
-            if pose["peek"] > 0.5 and i == 1:
-                this_lid = min(lid, 0.35)
-            if style == "wide":
-                scl_r, iris_r, pup_r = 22.0 * scale, 9.0 * scale, 4.2 * scale
-                sclera = True
-            elif style in ("heart", "spiral"):
-                scl_r, iris_r, pup_r = 18.0 * scale, 0.0, 0.0
-                sclera = True
-            elif style in ("shut_happy", "shut_sad"):
-                continue
-            else:
-                scl_r, iris_r, pup_r = 15.0 * scale, 13.0 * scale, 5.5 * scale
-                sclera = style == "half" or lid > 0.2
-            ry = scl_r if sclera else iris_r
-            cut = None
-            if this_lid > 0.02 and style not in ("shut_happy", "shut_sad"):
-                cut = cy - ry + 2.0 * ry * this_lid
-            if sclera:
-                self.stamp_ellipse(cx, cy, scl_r, scl_r * 1.05, 4.2, WHITE, clip_below=cut)
-            if iris_r > 0.5:
-                ix = cx + float(pose["look_x"]) * 6.0
-                iy = cy + float(pose["look_y"]) * 6.0
-                self.stamp_ellipse(ix, iy, iris_r, iris_r, 4.5, GREEN, clip_below=cut)
-                self.stamp_ellipse(ix, iy, pup_r, pup_r, 4.7, np.array([0.05, 0.05, 0.06], np.float32), clip_below=cut)
-                self.stamp_ellipse(ix - iris_r * 0.28, iy - iris_r * 0.32, iris_r * 0.28, iris_r * 0.22, 4.9, WHITE, clip_below=cut)
-
-
-def feature_points(pose):
-    hx, hy = forward_point(CX, HEAD_Y, pose)
-    origin = (hx, hy)
-
-    def feat(dx, dy):
-        x, y = forward_point(CX + dx, HEAD_Y + dy + float(pose["face_dy"]), pose)
-        a = math.radians(float(pose["tilt"]))
-        ca, sa = math.cos(a), math.sin(a)
-        px, py = x - origin[0], y - origin[1]
-        return ca * px - sa * py + origin[0], sa * px + ca * py + origin[1]
-
-    left = feat(-34.0, -16.0)
-    right = feat(34.0, -16.0)
-    mouth = feat(0.0, 22.0)
-    return (hx, hy), left, right, mouth
-
-
-def draw_poly_mouth(draw, cx, cy, pose):
-    kind = pose["mouth"]
-    open_amt = float(pose["mouth_open"])
-    w = 36.0
-    tilt = math.radians(float(pose["tilt"]))
-    ca, sa = math.cos(tilt), math.sin(tilt)
-
-    def rot(dx, dy):
-        return cx + ca * dx - sa * dy, cy + sa * dx + ca * dy
-
-    lip = (120, 48, 42, 255)
-    inner = (54, 22, 28, 255)
-    teeth = (248, 244, 236, 255)
-    if kind == "smile":
-        pts = [rot(-w, 2), rot(-w * 0.4, 10 + 8 * open_amt), rot(w * 0.4, 10 + 8 * open_amt), rot(w, 2)]
-        draw.line(pts, fill=lip, width=5)
-        if open_amt > 0.35:
-            draw.polygon([rot(-w * 0.55, 4), rot(0, 8 + 18 * open_amt), rot(w * 0.55, 4)], fill=inner)
-    elif kind == "grin":
-        draw.polygon(
-            [rot(-w, 0), rot(-w * 0.2, 16 + 14 * open_amt), rot(w * 0.2, 16 + 14 * open_amt), rot(w, 0)],
-            fill=inner,
-        )
-        draw.polygon([rot(-w * 0.7, 1), rot(0, 8), rot(w * 0.7, 1)], fill=teeth)
-        draw.line([rot(-w, -2), rot(0, 12), rot(w, -2)], fill=lip, width=4)
-    elif kind == "frown":
-        pts = [rot(-w, 8), rot(-w * 0.3, -2 - 6 * open_amt), rot(w * 0.3, -2 - 6 * open_amt), rot(w, 8)]
-        draw.line(pts, fill=lip, width=5)
-        if open_amt > 0.4:
-            draw.polygon([rot(-w * 0.4, 4), rot(0, -4 - 14 * open_amt), rot(w * 0.4, 4)], fill=inner)
-    elif kind == "o":
-        rw = 12 + 10 * open_amt
-        rh = 14 + 16 * open_amt
-        box = [cx - rw, cy - rh * 0.2, cx + rw, cy + rh]
-        draw.ellipse(box, fill=inner, outline=lip, width=4)
-    elif kind == "flat":
-        draw.line([rot(-w * 0.7, 2), rot(w * 0.7, 2)], fill=lip, width=5)
-    elif kind == "smirk":
-        draw.line([rot(-w * 0.2, 4), rot(w * 0.15, 2), rot(w * 0.85, -8)], fill=lip, width=5)
-    elif kind == "pout":
-        draw.ellipse([cx - 14, cy - 4, cx + 14, cy + 16], fill=(196, 92, 96, 255), outline=lip, width=3)
-    elif kind == "yawn":
-        draw.ellipse([cx - 18, cy - 6, cx + 18, cy + 28 + 10 * open_amt], fill=inner, outline=lip, width=4)
-    elif kind == "wave":
-        pts = []
-        for i in range(9):
-            u = i / 8.0
-            pts.append(rot(-w + u * 2 * w, math.sin(u * 6.0 + pose["t"] * 6.0) * 6.0))
-        draw.line(pts, fill=lip, width=5)
-    else:
-        draw.line([rot(-w * 0.6, 4), rot(w * 0.6, 4)], fill=lip, width=4)
-
-
-def draw_brows(draw, left, right, pose):
-    for (cx, cy), ang, side in (
-        (left, pose["brow_l"], -1.0),
-        (right, pose["brow_r"], 1.0),
-    ):
-        a = math.radians(ang)
-        dx, dy = math.cos(a) * 16.0, math.sin(a) * 10.0
-        x0, y0 = cx - side * 8 - dx, cy - 22 - dy
-        x1, y1 = cx + side * 14 + dx * 0.2, cy - 20 + dy * 0.3
-        draw.line([(x0, y0), (x1, y1)], fill=(110, 58, 18, 255), width=5)
-
-
-def draw_arc_eyes(draw, left, right, pose):
-    style = pose["eye"]
-    if style not in ("shut_happy", "shut_sad", "heart", "spiral"):
-        return
-    for cx, cy in (left, right):
-        if style == "shut_happy":
-            draw.arc([cx - 16, cy - 14, cx + 16, cy + 10], 200, 340, fill=(70, 40, 20, 255), width=5)
-        elif style == "shut_sad":
-            draw.arc([cx - 16, cy - 6, cx + 16, cy + 16], 20, 160, fill=(70, 40, 20, 255), width=5)
-        elif style == "heart":
-            s = 12.0 * float(pose["eye_scale"])
-            pts = []
-            for i in range(24):
-                t = i / 24.0 * math.tau
-                x = s * 0.9 * math.sin(t) ** 3
-                y = -s * (0.75 * math.cos(t) - 0.3 * math.cos(2 * t) - 0.15 * math.cos(3 * t) - 0.05 * math.cos(4 * t))
-                pts.append((cx + x, cy + y))
-            draw.polygon(pts, fill=(214, 46, 78, 255))
-            draw.ellipse([cx - s * 0.45, cy - s * 0.55, cx - s * 0.05, cy - s * 0.15], fill=(255, 220, 230, 255))
-        elif style == "spiral":
-            draw.ellipse([cx - 16, cy - 16, cx + 16, cy + 16], fill=(245, 248, 250, 255))
-            pts = []
-            for i in range(28):
-                t = i / 27.0
-                r = 2 + 12 * t
-                a = t * 4.2 * math.pi + float(pose["t"]) * math.tau
-                pts.append((cx + math.cos(a) * r, cy + math.sin(a) * r))
-            draw.line(pts, fill=(40, 40, 50, 255), width=3)
-
-
-def draw_fx(draw, head, pose):
-    hx, hy = head
-    t = float(pose["t"])
-    if pose["tears"] > 0.2:
-        drop = (t * 36.0) % 28.0
-        for s in (-1.0, 1.0):
-            x = hx + s * 38
-            y = hy + 8 + drop
-            draw.ellipse([x - 5, y - 8, x + 5, y + 10], fill=(186, 220, 245, 230))
-            y2 = hy + 8 + (drop + 16) % 28.0
-            draw.ellipse([x - 3.5, y2, x + 3.5, y2 + 12], fill=(170, 210, 240, 180))
-    if pose["sweat"] > 0.2:
-        x, y = hx + 62, hy - 10 + 6 * math.sin(t * math.tau)
-        draw.polygon([(x, y - 10), (x - 6, y + 6), (x + 6, y + 6)], fill=(190, 225, 245, 230))
-    if pose["zzz"] > 0.5:
-        for i, (ox, oy, sc) in enumerate(((18, -58, 10), (36, -78, 14), (56, -100, 18))):
-            x = hx + ox
-            y = hy + oy + math.sin(t * math.tau + i) * 3
-            draw.line([(x, y), (x + sc, y), (x, y + sc), (x + sc, y + sc)], fill=(90, 110, 160, 230), width=3)
-    if pose["hearts"] > 0.5:
-        for i, ox in enumerate((-28, 24)):
-            s = 8 + (i * 2)
-            cy = hy - 70 - ((t * 20 + i * 12) % 18)
-            cx = hx + ox
-            pts = []
-            for k in range(20):
-                u = k / 20.0 * math.tau
-                x = s * math.sin(u) ** 3
-                y = -s * (0.75 * math.cos(u) - 0.3 * math.cos(2 * u) - 0.12 * math.cos(3 * u))
-                pts.append((cx + x, cy + y))
-            draw.polygon(pts, fill=(220, 60, 90, 230))
-    if pose["spark"] > 0.5:
-        for i, (ox, oy) in enumerate(((-80, -120), (86, -130), (10, -150), (70, -70))):
-            tw = 0.45 + 0.55 * (0.5 + 0.5 * math.sin(t * math.tau * 2 + i))
-            cx, cy = hx + ox, hy + oy
-            r = 7 * tw
-            draw.line([(cx - r, cy), (cx + r, cy), (cx, cy - r * 1.4), (cx, cy + r * 1.4)], fill=(255, 214, 80, 230), width=3)
-
-
-def render_pose(pose) -> tuple[Image.Image, tuple[float, float]]:
-    canvas = Canvas()
-    canvas.paint_body(pose)
-    canvas.paint_limbs(pose)
-    head, left, right, mouth = feature_points(pose)
-    if pose["eye"] not in ("shut_happy", "shut_sad"):
-        canvas.paint_eyes(pose, (left, right))
-    rgb = np.clip(canvas.rgb * 255.0, 0, 255).astype(np.uint8)
-    alpha = np.clip(canvas.a * 255.0, 0, 255).astype(np.uint8)
-    im = Image.fromarray(np.dstack([rgb, alpha]), "RGBA")
-    draw = ImageDraw.Draw(im)
-    draw_brows(draw, left, right, pose)
-    draw_arc_eyes(draw, left, right, pose)
-    draw_poly_mouth(draw, mouth[0], mouth[1], pose)
-    draw_fx(draw, head, pose)
-    return im, mouth
-
-
-def perf_happy(t):
-    p = pulse(t)
-    return pose(
-        squash=1.03 + 0.04 * p,
-        l_raise=50 + 8 * p,
-        l_bend=18,
-        r_raise=50 + 8 * p,
-        r_bend=18,
-        eye="shut_happy",
-        mouth="grin",
-        mouth_open=0.55 + 0.25 * p,
-        blush=0.25,
-        l_hand="open",
-        r_hand="open",
-        t=t,
-    )
-
-
-def perf_proud(t):
-    p = pulse(t)
-    return pose(
-        squash=1.05 + 0.03 * p,
-        face_dy=-10,
-        l_ik=1, r_ik=1,
-        l_tx=CX - 128, l_ty=305,
-        r_tx=CX + 128, r_ty=305,
-        lid=0.45,
-        look_y=0.75,
-        brow_l=20, brow_r=-10,
-        mouth="smirk",
-        blush=0.12,
-        l_hand="fist", r_hand="fist",
-        t=t,
-    )
-
-
-def perf_sleepy(t):
-    sway = math.sin(2 * math.pi * t)
-    return pose(
-        lean=7 * sway,
-        squash=0.9,
-        face_dy=10,
-        l_raise=8, l_bend=8,
-        r_raise=6, r_bend=10,
-        lid=0.82,
-        eye="shut_sad",
-        mouth="yawn",
-        mouth_open=0.7 + 0.3 * pulse(t),
-        zzz=1,
-        t=t,
-    )
-
-
-def perf_love(t):
-    return pose(
-        lean=6 * math.sin(2 * math.pi * t),
-        l_ik=1, r_ik=1,
-        l_tx=CX + 20, l_ty=188,
-        r_tx=CX - 20, r_ty=196,
-        eye="heart",
-        eye_scale=1.15,
-        mouth="smile",
-        mouth_open=0.45,
-        blush=0.95,
-        hearts=1,
-        l_hand="open", r_hand="open",
-        t=t,
-    )
-
-
-def perf_scared(t):
-    wob = math.sin(4 * math.pi * t)
-    return pose(
-        lean=4 * wob,
-        squash=0.78 + 0.03 * wob,
-        l_raise=158, l_bend=18,
-        r_raise=162, r_bend=14,
-        l_spread=70, r_spread=70,
-        l_knee=28, r_knee=26,
-        eye="wide",
-        eye_scale=1.25,
-        look_x=0.4 * wob,
-        brow_l=-20, brow_r=-22,
-        mouth="o",
-        mouth_open=0.9,
-        sweat=0.8,
-        l_hand="spread", r_hand="spread",
-        t=t,
-    )
-
-
-def perf_excited(t):
-    p = pulse(t)
-    alt = math.sin(2 * math.pi * t)
-    return pose(
-        squash=1.04 + 0.05 * p,
-        l_raise=72 + 18 * alt,
-        l_bend=108,
-        r_raise=72 - 18 * alt,
-        r_bend=108,
-        eye="wide",
-        eye_scale=1.08,
-        mouth="grin",
-        mouth_open=0.9,
-        blush=0.4,
-        l_hand="fist", r_hand="fist",
-        t=t,
-    )
-
-
-def perf_bored(t):
-    return pose(
-        lean=-4,
-        squash=0.94,
-        tilt=-12,
-        l_ik=1, l_tx=CX - 30, l_ty=108,
-        r_raise=4, r_bend=6,
-        lid=0.62,
-        look_x=-0.55,
-        brow_l=0, brow_r=2,
-        mouth="flat",
-        l_hand="open", r_hand="open",
-        t=t,
-    )
-
-
-def perf_embarrassed(t):
-    p = pulse(t)
-    return pose(
-        squash=0.93,
-        l_ik=1, r_ik=1,
-        l_tx=CX - 26, l_ty=86,
-        r_tx=CX + 22, r_ty=90,
-        lid=0.82,
-        peek=1,
-        blush=1.0,
-        sweat=1.0,
-        mouth="smile",
-        mouth_open=0.1,
-        l_hand="open", r_hand="open",
-        t=t,
-    )
-
-
-def perf_curious(t):
-    return pose(
-        lean=6,
-        tilt=18,
-        face_dy=-4,
-        l_raise=128, l_bend=6,
-        r_ik=1, r_tx=CX + 120, r_ty=310,
-        eye="wide",
-        eye_scale=1.12,
-        look_x=0.85, look_y=-0.55,
-        brow_l=-22, brow_r=18,
-        peek=1,
-        mouth="o",
-        mouth_open=0.55,
-        l_hand="point", r_hand="open",
-        t=t,
-    )
-
-
-def perf_relieved(t):
-    p = pulse(t)
-    return pose(
-        squash=0.92 + 0.1 * (1 - p),
-        face_dy=4,
-        l_ik=1, l_tx=CX - 10, l_ty=230,
-        r_raise=20, r_bend=16,
-        eye="shut_happy",
-        mouth="smile",
-        mouth_open=0.35,
-        blush=0.2,
-        l_hand="open", r_hand="open",
-        t=t,
-    )
-
-
-def perf_disappointed(t):
-    return pose(
-        squash=0.84,
-        face_dy=16,
-        lean=3 * math.sin(2 * math.pi * t),
-        l_raise=6, l_bend=6,
-        r_raise=8, r_bend=8,
-        l_spread=36, r_spread=36,
-        l_knee=18, r_knee=18,
-        lid=0.5,
-        look_y=0.8,
-        brow_l=22, brow_r=24,
-        eye="half",
-        mouth="frown",
-        mouth_open=0.35,
-        l_hand="open", r_hand="open",
-        t=t,
-    )
-
-
-def perf_grateful(t):
-    p = pulse(t)
-    return pose(
-        lean=0,
-        squash=0.9,
-        face_dy=6 + 4 * p,
-        shift=0,
-        l_ik=1, r_ik=1,
-        l_tx=CX - 8, l_ty=214,
-        r_tx=CX + 8, r_ty=214,
-        eye="shut_happy",
-        mouth="smile",
-        mouth_open=0.4,
-        blush=0.4,
-        l_hand="together", r_hand="together",
-        t=t,
-    )
-
-
-def perf_worried(t):
-    look = math.sin(2 * math.pi * t)
-    return pose(
-        squash=0.95,
-        l_ik=1, r_ik=1,
-        l_tx=CX - 14, l_ty=250,
-        r_tx=CX + 14, r_ty=254,
-        lid=0.15,
-        look_x=0.9 * look,
-        brow_l=-14, brow_r=-12,
-        eye="wide",
-        eye_scale=0.95,
-        mouth="frown",
-        mouth_open=0.25,
-        sweat=0.45,
-        l_hand="together", r_hand="together",
-        t=t,
-    )
-
-
-def perf_smug(t):
-    return pose(
-        lean=-8,
-        squash=1.04,
-        face_dy=-8,
-        l_ik=1, l_tx=CX - 20, l_ty=78,
-        r_ik=1, r_tx=CX + 130, r_ty=325,
-        lid=0.5,
-        look_x=0.7, look_y=0.35,
-        brow_l=-8, brow_r=22,
-        mouth="smirk",
-        l_hand="open", r_hand="fist",
-        t=t,
-    )
-
-
-def perf_crying(t):
-    bob = math.sin(4 * math.pi * t)
-    return pose(
-        squash=0.9 + 0.03 * bob,
-        face_dy=6,
-        l_ik=1, r_ik=1,
-        l_tx=CX - 42, l_ty=140,
-        r_tx=CX + 42, r_ty=146,
-        eye="shut_sad",
-        brow_l=26, brow_r=26,
-        mouth="frown",
-        mouth_open=0.85,
-        tears=1,
-        l_hand="open", r_hand="open",
-        t=t,
-    )
-
-
-def perf_wronged(t):
-    return pose(
-        shift=16,
-        lean=-8,
-        tilt=-12,
-        squash=0.96,
-        l_ik=1, r_ik=1,
-        l_tx=CX + 36, l_ty=268,
-        r_tx=CX - 10, r_ty=250,
-        lid=0.22,
-        look_x=-1.0,
-        brow_l=18, brow_r=8,
-        mouth="pout",
-        mouth_open=0.2,
-        tears=0.55,
-        blush=0.3,
-        l_hand="fist", r_hand="fist",
-        t=t,
-    )
-
-
-def perf_cheer(t):
-    p = pulse(t)
-    return pose(
-        squash=1.02 + 0.04 * p,
-        l_raise=148, l_bend=6,
-        r_raise=148, r_bend=6,
-        eye="shut_happy",
-        mouth="o",
-        mouth_open=0.8,
-        blush=0.35,
-        l_hand="open", r_hand="open",
-        t=t,
-    )
-
-
-def perf_dizzy(t):
-    return pose(
-        lean=10 * math.cos(2 * math.pi * t),
-        l_raise=36, l_bend=16,
-        r_raise=36, r_bend=16,
-        l_spread=64, r_spread=40,
-        eye="spiral",
-        eye_scale=1.1,
-        mouth="wave",
-        l_hand="open", r_hand="open",
-        t=t,
-    )
-
-
-def perf_focused(t):
-    return pose(
-        face_dy=2,
-        l_ik=1, r_ik=1,
-        l_tx=CX - 46, l_ty=92,
-        r_tx=CX + 46, r_ty=92,
-        lid=0.28,
-        look_y=0.15,
-        brow_l=-14, brow_r=-14,
-        eye="green",
-        eye_scale=0.85,
-        mouth="flat",
-        l_hand="open", r_hand="together",
-        t=t,
-    )
-
-
-def perf_greet(t):
-    return pose(
-        l_raise=150 - 28 * math.cos(2 * math.pi * t),
-        l_bend=16,
-        r_ik=1, r_tx=CX + 48, r_ty=300,
-        eye="green",
-        eye_scale=1.05,
-        mouth="grin",
-        mouth_open=0.5,
-        blush=0.2,
-        l_hand="open", r_hand="open",
-        t=t,
-    )
-
-
-def perf_agree(t):
-    return pose(
-        face_dy=16 * pulse(t),
-        l_ik=1, l_tx=CX - 55, l_ty=230,
-        r_raise=22, r_bend=18,
-        eye="green",
-        mouth="smile",
-        mouth_open=0.45,
-        l_hand="thumb", r_hand="open",
-        t=t,
-    )
-
-
-def perf_refuse(t):
-    shake = math.sin(4 * math.pi * t)
-    return pose(
-        tilt=12 * shake,
-        l_ik=1, r_ik=1,
-        l_tx=CX - 78, l_ty=210,
-        r_tx=CX + 78, r_ty=210,
-        lid=0.12,
-        brow_l=-18, brow_r=-18,
-        mouth="frown",
-        mouth_open=0.45,
-        l_hand="spread", r_hand="spread",
-        t=t,
-    )
-
-
-def perf_ponder(t):
-    return pose(
-        tilt=6,
-        l_ik=1, l_tx=CX - 6, l_ty=62,
-        r_back=1, r_raise=12, r_bend=8,
-        lid=0.22,
-        look_y=-1.0,
-        brow_l=12, brow_r=-6,
-        mouth="flat",
-        l_hand="open", r_hand="open",
-        t=t,
-    )
-
-
-def perf_annoyed(t):
-    return pose(
-        l_ik=1, r_ik=1,
-        l_tx=CX + 30, l_ty=276,
-        r_tx=CX - 24, r_ty=262,
-        l_lift=40 * pulse(t),
-        lid=0.35,
-        look_y=-0.95,
-        brow_l=-18, brow_r=-20,
-        eye="half",
-        mouth="flat",
-        l_hand="fist", r_hand="fist",
-        t=t,
-    )
-
-
-def perf_celebrate(t):
-    return pose(
-        squash=1.03,
-        l_ik=1, r_ik=1,
-        l_tx=CX - 12, l_ty=36,
-        r_tx=CX + 12, r_ty=36,
-        eye="shut_happy",
-        mouth="grin",
-        mouth_open=0.75,
-        blush=0.5,
-        spark=1,
-        l_hand="open", r_hand="open",
-        t=t,
-    )
-
-
-def perf_hug(t):
-    p = pulse(t)
-    return pose(
-        squash=1.02 + 0.03 * p,
-        l_ik=1, r_ik=1,
-        l_tx=CX - 28, l_ty=268,
-        r_tx=CX + 28, r_ty=268,
-        eye="shut_happy",
-        mouth="smile",
-        mouth_open=0.55,
-        blush=0.85,
-        hand_scale=1.35,
-        l_hand="open", r_hand="open",
-        t=t,
-    )
-
-
-def perf_shocked(t):
-    wob = math.sin(6 * math.pi * t)
-    return pose(
-        lean=-4,
-        squash=1.04,
-        l_raise=78, l_bend=18,
-        r_raise=78, r_bend=18,
-        eye="wide",
-        eye_scale=1.5,
-        brow_l=-26, brow_r=-26,
-        mouth="o",
-        mouth_open=1.0,
-        look_x=0.1 * wob,
-        l_hand="spread", r_hand="spread",
-        t=t,
-    )
-
-
-PERFORMANCES = {
-    "happy": (perf_happy, "Arms lifted on a diagonal, shut smile-eyes, toothy grin, gentle bounce."),
-    "proud": (perf_proud, "Both hands on hips, chest tall, chin up, one brow raised, smirk."),
-    "sleepy": (perf_sleepy, "Arms hanging, slouch and sway, heavy lids, yawn, floating z's."),
-    "love": (perf_love, "Self-hug across the chest, heart-shaped eyes, heavy blush, rising hearts."),
-    "scared": (perf_scared, "Crouch with both arms thrown up, huge white eyes, round mouth, tremble."),
-    "excited": (perf_excited, "Fists pump near the shoulders, body stretches, wide eyes, big grin."),
-    "bored": (perf_bored, "Lean onto one hand on the cheek, other arm hanging, half-lidded flat mouth."),
-    "embarrassed": (perf_embarrassed, "Both hands hide the face, full blush, one eye peeks, sweat drop."),
-    "curious": (perf_curious, "Head tilt, one arm points up, mismatched brows, one wide eye, small o."),
-    "relieved": (perf_relieved, "Hand on the chest, exhale squash, eyes closed in a soft smile."),
-    "disappointed": (perf_disappointed, "Head bowed, arms limp, knees in, frown and sad brows."),
-    "grateful": (perf_grateful, "Small bow, palms pressed together, eyes closed, warm smile."),
-    "worried": (perf_worried, "Hands wrung at the stomach, inner brows up, eyes dart, small frown."),
-    "smug": (perf_smug, "Lean back, one hand behind the head, one on the hip, asymmetric smirk."),
-    "crying": (perf_crying, "Hands on the cheeks, squeezed eyes, open sob, falling tears."),
-    "wronged": (perf_wronged, "Hip cocked, arms folded tight, side-eye, pout, a single tear line."),
-    "cheer": (perf_cheer, "Both arms straight up in a V, bounce, happy eyes, open cheer mouth."),
-    "dizzy": (perf_dizzy, "Body rocks side to side, limp arms, spiral eyes, wavy mouth."),
-    "focused": (perf_focused, "Both hands frame the eyes like a visor, brows down, small steady eyes, flat mouth."),
-    "greet": (perf_greet, "One arm waves overhead, the other rests in front, open grin."),
-    "agree": (perf_agree, "Nod, one hand gives a thumbs-up, smile."),
-    "refuse": (perf_refuse, "Both palms pushed forward, head shakes, brows down, frown."),
-    "ponder": (perf_ponder, "One hand rests on top of the head, eyes look up, the other arm is behind the back."),
-    "annoyed": (perf_annoyed, "Arms crossed, one foot taps, eyes rolled up, tight mouth."),
-    "celebrate": (perf_celebrate, "Hands meet overhead in a clap, happy eyes, sparkles around the head."),
-    "hug": (perf_hug, "Both arms come forward with open hands gathered at the belly, blush, closed smile."),
-    "shocked": (perf_shocked, "Rigid arms straight out, body leans back, giant eyes, round mouth."),
+PEAKS = {
+    "happy": (
+        pose(squash=0.97, smile=1.0, lid=0.58, blush=0.75),
+        "Squint, smile, and blush on the reference face, with a small bounce.",
+    ),
+    "proud": (
+        pose(squash=1.07, widen=1.06, head_dy=-14, lid=0.42, smile=0.5, eye_dy=2),
+        "Taller chest, chin up, lidded smirk on the reference face.",
+    ),
+    "sleepy": (
+        pose(squash=0.9, head_dy=14, lean=5, lid=0.96, mouth_open=0.85, smile=-0.05, eye_scale=0.7),
+        "Slouch, eye shut to a crease, mouth open in a yawn.",
+    ),
+    "love": (
+        pose(widen=1.08, blush=1.0, smile=0.95, lid=0.12, eye_scale=1.2),
+        "Heavy blush, soft smile, eye a little wider.",
+    ),
+    "scared": (
+        pose(squash=0.86, widen=1.05, eye_scale=1.5, mouth_open=1.0, smile=-0.3, h0_dx=12, h0_dy=-72, h0_rot=-8, head_dy=4),
+        "Crouch, eye widened, mouth open.",
+    ),
+    "excited": (
+        pose(squash=1.1, widen=1.04, eye_scale=1.4, smile=0.85, mouth_open=0.7, blush=0.45),
+        "Stretched tall, wide eye, open grin.",
+    ),
+    "bored": (
+        pose(tilt=-11, lid=0.58, smile=-0.35, eye_dx=-3, head_dy=8, h0_dx=28, h0_dy=-92, h0_rot=22),
+        "Head tilt, half-shut eye, flat mouth.",
+    ),
+    "embarrassed": (
+        pose(squash=0.88, blush=1.0, lid=0.48, eye_dx=-4, smile=0.4, h0_dx=6, h0_dy=-112, shift=-6),
+        "Shrink, strong blush, glance away, small smile.",
+    ),
+    "curious": (
+        pose(tilt=14, squash=1.05, lean=5, eye_scale=1.4, eye_dy=-3, mouth_open=0.55, head_dy=-8),
+        "Head cocked the other way, eye wide, small open mouth.",
+    ),
+    "relieved": (
+        pose(squash=0.95, lid=0.92, smile=0.75, blush=0.2, head_dy=6, lean=-3),
+        "Exhale squash, eye closed, soft smile.",
+    ),
+    "disappointed": (
+        pose(squash=0.86, head_dy=18, smile=-1.0, lid=0.28, eye_dy=4, eye_scale=0.88),
+        "Body and head sink, eye down, mouth pulled into a frown.",
+    ),
+    "grateful": (
+        pose(squash=0.9, head_dy=20, smile=0.85, lid=0.82, blush=0.55),
+        "Small bow, eyes closed, smile, blush.",
+    ),
+    "worried": (
+        pose(squash=0.95, eye_scale=1.28, smile=-0.7, eye_dx=4, brow=0.8, blush=0.12, h0_dx=-8, h0_dy=-10, h1_dx=6, h1_dy=-6),
+        "Eye wide and glancing, brow pinched, frown.",
+    ),
+    "smug": (
+        pose(lean=-9, squash=1.04, lid=0.58, smile=0.6, eye_dx=5, head_dy=-8, widen=1.05),
+        "Lean back, lidded eye, one-sided smile, chest out.",
+    ),
+    "crying": (
+        pose(squash=0.86, lean=8, lid=0.88, smile=-1.0, mouth_open=0.7, tear=1.0, head_dy=14, eye_scale=0.75),
+        "Eye squeezed, frown open, tears on the cheek under the eye.",
+    ),
+    "wronged": (
+        pose(lean=-9, shift=8, smile=-0.55, mouth_open=0.15, tear=0.55, eye_dx=-5, lid=0.12, head_dy=4),
+        "Lean aside, side glance, pout, a single tear.",
+    ),
+    "cheer": (
+        pose(squash=1.06, h0_dx=18, h0_dy=-96, h0_rot=-12, smile=0.6, mouth_open=1.0, lid=0.28, blush=0.3),
+        "Stretched up, eye open, mouth opened wide.",
+    ),
+    "dizzy": (
+        pose(lean=10, tilt=-14, eye_dx=6, eye_dy=-4, smile=-0.15, mouth_open=0.3),
+        "Whole photo rocked sideways, eye slid off center.",
+    ),
+    "focused": (
+        pose(squash=1.02, lean=-6, lid=0.55, eye_scale=0.68, eye_dy=4, smile=-0.05, head_dy=2, brow=0.55),
+        "Narrow steady eye, level mouth.",
+    ),
+    "greet": (
+        pose(head_dy=-12, lean=-6, smile=1.0, eye_scale=1.08, blush=0.25, lid=0.05),
+        "Chin up, slight lean back, open eye, big smile.",
+    ),
+    "agree": (
+        pose(head_dy=20, smile=0.9, lid=0.15, squash=0.96),
+        "Nod down, smile.",
+    ),
+    "refuse": (
+        pose(tilt=10, smile=-0.9, eye_scale=1.02, brow=0.7, lean=4, shift=6),
+        "Head shake, frown, pinched brow.",
+    ),
+    "ponder": (
+        pose(tilt=-10, squash=0.92, lean=-6, eye_dy=-8, eye_scale=0.95, lid=0.2, head_dy=6, smile=-0.1),
+        "Eye rolled up, head tilt, small thoughtful mouth.",
+    ),
+    "annoyed": (
+        pose(lid=0.5, eye_dy=-8, smile=-0.4, lean=5, brow=0.9, h0_dx=-8, h1_dx=4),
+        "Eye rolled up under the lid, tight mouth, a pinched brow.",
+    ),
+    "celebrate": (
+        pose(squash=0.96, lean=6, lid=0.75, smile=1.0, blush=0.85, mouth_open=0.1),
+        "Tall happy squint, big smile, blush.",
+    ),
+    "hug": (
+        pose(widen=1.08, squash=1.03, smile=0.85, blush=0.9, lid=0.2),
+        "Wider body, blush, soft smile.",
+    ),
+    "shocked": (
+        pose(lean=-8, squash=1.05, eye_scale=1.7, mouth_open=1.2, smile=-0.05, head_dy=-6),
+        "Eye very wide, mouth round, slight lean back.",
+    ),
 }
 
 
-def loop_pose(emotion_id, t):
-    fn, _desc = PERFORMANCES[emotion_id]
-    pose_out = fn(t)
-    pose_out["t"] = t
-    return pose_out
+def save_png(arr, path: Path):
+    Image.fromarray(arr, "RGBA").save(path, format="PNG", optimize=True, compress_level=9)
 
 
-def main_t(index, count):
-    """Build into the iconic pose (t=0.5) and hold it, so a non-looping player
-    freezes on the readable emotion instead of a passing in-between."""
-    peak = max(count // 2, 1)
-    if index >= peak:
-        return 0.5
-    return 0.5 * index / peak
-
-
-def frame_pose(emotion_id, phase, index, count):
-    neutral = base_pose()
-    if phase == "main":
-        return loop_pose(emotion_id, main_t(index, count))
-    if phase == "in":
-        start = loop_pose(emotion_id, 0.0)
-        t = (index + 1) / (count + 1)
-        return lerp_pose(neutral, start, smooth(t))
-    last = loop_pose(emotion_id, 0.5)
-    t = (index + 1) / (count + 1)
-    return lerp_pose(last, neutral, smooth(t))
-
-
-def save_frame(im: Image.Image, path: Path):
-    path.parent.mkdir(parents=True, exist_ok=True)
-    im.save(path, format="PNG", optimize=True, compress_level=9)
-
-
-def write_manifest(directory: Path, name: str, loop: bool, mouths: list[tuple[int, float, float]]):
+def write_manifest(directory: Path, name: str, mouths):
     frames = []
     blob = bytearray()
-    files = sorted(directory.glob("*.png"))
-    for path in files:
+    for path in sorted(directory.glob("*.png")):
         data = path.read_bytes()
         blob += data
         frames.append({"file": path.name, "sha256": hashlib.sha256(data).hexdigest()})
@@ -1211,26 +665,23 @@ def write_manifest(directory: Path, name: str, loop: bool, mouths: list[tuple[in
     for frame, x, y in mouths:
         if keys and keys[-1]["frame"] == frame:
             continue
-        keys.append({"frame": frame, "x": round(x, 2), "y": round(y, 2)})
-    if len(keys) < 2 and frames:
-        keys = [
-            {"frame": 0, "x": keys[0]["x"], "y": keys[0]["y"]},
-            {"frame": len(frames) - 1, "x": keys[0]["x"], "y": keys[0]["y"]},
-        ]
+        keys.append({"frame": frame, "x": round(float(x), 2), "y": round(float(y), 2)})
+    if len(keys) == 1 and frames:
+        keys.append({"frame": len(frames) - 1, "x": keys[0]["x"], "y": keys[0]["y"]})
     anchor = keys[0]
     manifest = {
         "name": name,
         "emotion": name,
         "fps": FPS,
         "frameCount": len(frames),
-        "loop": loop,
+        "loop": False,
         "priority": 25,
         "mouthAnchor": {"frame": anchor["frame"], "x": anchor["x"], "y": anchor["y"]},
         "mouthKeyframes": keys,
         "transitionIn": "",
         "transitionOut": "",
         "canvas": {"width": W, "height": H},
-        "groundY": int(GROUND),
+        "groundY": GROUND,
         "frames": frames,
         "reviewed": True,
         "sourceSha256": hashlib.sha256(blob).hexdigest(),
@@ -1239,115 +690,139 @@ def write_manifest(directory: Path, name: str, loop: bool, mouths: list[tuple[in
     (directory / "manifest.json").write_text(json.dumps(manifest, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
 
 
-def render_clip(emotion_id, phase, count, loop):
+def clip_times(phase, index, count):
+    if index == 0:
+        return 0.0
+    if phase == "in":
+        return 0.9 * index / max(count - 1, 1)
+    if phase == "main":
+        peak_at = max(count // 2, 1)
+        if index >= peak_at:
+            return 1.0
+        return index / peak_at
+    return max(0.0, 1.0 - index / max(count - 1, 1))
+
+
+def render_clip(parts, canon_bytes, emotion_id, peak, phase, count):
     name = emotion_id if phase == "main" else f"{emotion_id}_{phase}"
     dest = ANIM / name
     if dest.exists():
         shutil.rmtree(dest)
     dest.mkdir(parents=True)
+    anchors = parts["anchors"]
+    mouth = anchors["mouth"]
     mouths = []
-    sample_at = {0, count // 2, count - 1}
     for i in range(count):
-        posed = frame_pose(emotion_id, "main" if phase == "main" else phase, i, count)
-        im, mouth = render_pose(posed)
-        save_frame(im, dest / f"{i:04d}.png")
-        if i in sample_at:
-            mouths.append((i, mouth[0], mouth[1]))
-    # Main clips point at their own transitions. In/out clips leave those blank,
-    # matching angry_in / angry_out.
-    write_manifest(dest, name, loop, mouths)
+        t = clip_times(phase, i, count)
+        path = dest / f"{i:04d}.png"
+        if i == 0:
+            path.write_bytes(canon_bytes)
+            mouths.append((0, mouth[0], mouth[1]))
+            continue
+        arr = render_pose(parts, scale_pose(peak, t))
+        save_png(arr, path)
+        mx, my = forward_point(mouth[0], mouth[1], scale_pose(peak, t), anchors)
+        mouths.append((i, mx, my))
+    write_manifest(dest, name, mouths)
     if phase == "main":
-        manifest_path = dest / "manifest.json"
-        manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+        path = dest / "manifest.json"
+        manifest = json.loads(path.read_text(encoding="utf-8"))
         manifest["transitionIn"] = f"{emotion_id}_in"
         manifest["transitionOut"] = f"{emotion_id}_out"
-        manifest_path.write_text(json.dumps(manifest, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+        path.write_text(json.dumps(manifest, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
     return sum(p.stat().st_size for p in dest.glob("*.png"))
 
 
-def render_all():
+def render_all(parts):
+    canon_bytes = CANON_PNG.read_bytes()
     total_new = 0
-    for emotion_id in PERFORMANCES:
+    for emotion_id, (peak, _desc) in PEAKS.items():
         print(f"render {emotion_id}", flush=True)
-        total_new += render_clip(emotion_id, "in", N_IN, False)
-        total_new += render_clip(emotion_id, "main", N_MAIN, False)
-        total_new += render_clip(emotion_id, "out", N_OUT, False)
+        total_new += render_clip(parts, canon_bytes, emotion_id, peak, "in", N_IN)
+        total_new += render_clip(parts, canon_bytes, emotion_id, peak, "main", N_MAIN)
+        total_new += render_clip(parts, canon_bytes, emotion_id, peak, "out", N_OUT)
     total = sum(p.stat().st_size for p in ANIM.rglob("*.png"))
-    print(f"new png bytes {total_new} ({total_new/1024/1024:.2f} MiB)")
-    print(f"library png bytes {total} ({total/1024/1024:.2f} MiB)")
+    print(f"new png bytes {total_new} ({total_new / 1024 / 1024:.2f} MiB)")
+    print(f"library png bytes {total} ({total / 1024 / 1024:.2f} MiB)")
     if total > SAFE_BUDGET:
         raise SystemExit(f"frame bytes {total} exceed safe budget {SAFE_BUDGET}")
-    return total
 
 
-def render_peaks(out_dir: Path):
-    out_dir.mkdir(parents=True, exist_ok=True)
-    images = []
-    neutral, _ = render_pose(base_pose())
-    neutral.save(out_dir / "_neutral.png")
-    for emotion_id in PERFORMANCES:
-        im, _ = render_pose(loop_pose(emotion_id, 0.5))
-        im.save(out_dir / f"{emotion_id}.png")
-        images.append((emotion_id, im))
-    return images
+def on_white(im):
+    bg = Image.new("RGBA", im.size, (255, 255, 255, 255))
+    bg.alpha_composite(im)
+    return bg.convert("RGB")
 
 
-def contact_sheet(images, path: Path, label_prefix=""):
+def paste_cell(sheet, draw, im, index, cell_w, cell_h, label):
+    thumb = on_white(im)
+    thumb.thumbnail((cell_w - 8, cell_h - 22))
+    cols = sheet.size[0] // cell_w
+    r, c = divmod(index, cols)
+    x = c * cell_w + (cell_w - thumb.size[0]) // 2
+    y = r * cell_h + 2
+    sheet.paste(thumb, (x, y))
+    draw.text((c * cell_w + 4, r * cell_h + cell_h - 16), label, fill=(20, 20, 20))
+
+
+def contact_sheet(parts):
     cols = 6
     cell_w, cell_h = 150, 214
-    rows = (len(images) + cols - 1) // cols
-    sheet = Image.new("RGBA", (cols * cell_w, rows * cell_h), (28, 28, 32, 255))
+    ids = list(PEAKS)
+    rows = 1 + (len(ids) + cols - 1) // cols
+    sheet = Image.new("RGB", (cols * cell_w, rows * cell_h), (244, 244, 246))
     draw = ImageDraw.Draw(sheet)
-    for i, (emotion_id, im) in enumerate(images):
-        thumb = im.copy()
-        thumb.thumbnail((cell_w - 10, cell_h - 28))
-        bg = Image.new("RGBA", thumb.size, (48, 48, 54, 255))
-        bg.alpha_composite(thumb)
-        r, c = divmod(i, cols)
-        x = c * cell_w + (cell_w - bg.size[0]) // 2
-        y = r * cell_h + 4
-        sheet.alpha_composite(bg, (x, y))
-        draw.text((c * cell_w + 6, r * cell_h + cell_h - 18), label_prefix + emotion_id, fill=(245, 245, 245, 255))
-    path.parent.mkdir(parents=True, exist_ok=True)
-    sheet.convert("RGB").save(path, quality=92)
-    print("wrote", path)
+    canon = Image.fromarray(parts["canon"], "RGBA")
+    proof = [canon, Image.open(ANIM / "happy" / "0000.png"), Image.open(ANIM / "scared" / "0000.png"), Image.open(ANIM / "hug" / "0000.png")]
+    labels = ["reference", "happy/0000", "scared/0000", "hug/0000"]
+    for i, (label, im) in enumerate(zip(labels, proof)):
+        paste_cell(sheet, draw, im.convert("RGBA"), i, cell_w, cell_h, label)
+    for i, emotion_id in enumerate(ids):
+        im = Image.open(ANIM / emotion_id / "0004.png")
+        paste_cell(sheet, draw, im.convert("RGBA"), cols + i, cell_w, cell_h, emotion_id)
+    for path in (
+        ROOT / "source" / "emotion" / "contact-sheet.png",
+        Path("/opt/cursor/artifacts/emotion-contact-sheet.png"),
+    ):
+        path.parent.mkdir(parents=True, exist_ok=True)
+        sheet.save(path, quality=92)
+        print("wrote", path)
 
 
-def motion_sheet(path: Path):
-    """Four frames per new emotion: start, middle of the rise, peak, held peak."""
-    cols = 4
-    frames = (0, 2, 4, 7)
-    cell_w, cell_h = 120, 168
-    ids = list(PERFORMANCES)
-    sheet = Image.new("RGBA", (cols * cell_w + 72, len(ids) * cell_h), (28, 28, 32, 255))
+def motion_sheet():
+    ids = list(PEAKS)
+    frames = (0, 2, 4, 5)
+    cell_w, cell_h = 110, 150
+    sheet = Image.new("RGB", (len(frames) * cell_w + 78, len(ids) * cell_h), (244, 244, 246))
     draw = ImageDraw.Draw(sheet)
     for r, emotion_id in enumerate(ids):
-        draw.text((6, r * cell_h + 8), emotion_id, fill=(245, 245, 245, 255))
+        draw.text((4, r * cell_h + 8), emotion_id, fill=(20, 20, 20))
         for c, index in enumerate(frames):
-            im = Image.open(ANIM / emotion_id / f"{index:04d}.png")
-            thumb = im.copy()
+            im = Image.open(ANIM / emotion_id / f"{index:04d}.png").convert("RGBA")
+            thumb = on_white(im)
             thumb.thumbnail((cell_w - 8, cell_h - 8))
-            bg = Image.new("RGBA", thumb.size, (48, 48, 54, 255))
-            bg.alpha_composite(thumb)
-            x = 72 + c * cell_w + (cell_w - bg.size[0]) // 2
-            y = r * cell_h + (cell_h - bg.size[1]) // 2
-            sheet.alpha_composite(bg, (x, y))
-    path.parent.mkdir(parents=True, exist_ok=True)
-    sheet.convert("RGB").save(path, quality=90)
-    print("wrote", path)
+            x = 78 + c * cell_w + (cell_w - thumb.size[0]) // 2
+            y = r * cell_h + (cell_h - thumb.size[1]) // 2
+            sheet.paste(thumb, (x, y))
+    for path in (
+        ROOT / "source" / "emotion" / "motion-sheet.png",
+        Path("/opt/cursor/artifacts/emotion-motion-sheet.png"),
+    ):
+        path.parent.mkdir(parents=True, exist_ok=True)
+        sheet.save(path, quality=90)
+        print("wrote", path)
 
 
 def sync_catalog():
     data = json.loads(CATALOG_PATH.read_text(encoding="utf-8"))
     ids = [e["id"] for e in data["emotions"]]
-    if set(PERFORMANCES) - set(ids):
-        raise SystemExit(f"catalog missing {set(PERFORMANCES) - set(ids)}")
+    missing = set(PEAKS) - set(ids)
+    if missing:
+        raise SystemExit(f"catalog missing {missing}")
     for emotion in data["emotions"]:
         if emotion.get("legacy"):
             continue
-        if emotion["id"] not in PERFORMANCES:
-            raise SystemExit(f"no performance for {emotion['id']}")
-        _fn, desc = PERFORMANCES[emotion["id"]]
+        _peak, desc = PEAKS[emotion["id"]]
         for key in ("source", "start", "step", "count", "reverse"):
             emotion.pop(key, None)
         emotion["clip"] = f"animations/{emotion['id']}"
@@ -1355,17 +830,35 @@ def sync_catalog():
         emotion["transition_out"] = f"{emotion['id']}_out"
         emotion["fps"] = FPS
         emotion["production"] = (
-            "Original soft-3D skeleton performance from tools/render_emotions.py. "
+            "Warp of source/emotion/reference-neutral.jpg via tools/render_emotions.py. "
+            "Frame 0 of this clip and of its in/out clips is source/emotion/neutral-reference.png "
+            "(uniform scale of that photo onto 420x560, backdrop removed). Later frames move that photo. "
             + desc
-            + " Not a crop, reverse, or rename of a legacy plate."
         )
         if emotion["id"] == "happy":
             emotion["note"] = (
                 "Low intensity returns to idle. Intensity >= 0.6 still plays the embedded full laugh "
-                "(toLaugh/video/fromLaugh). This plate is the distinct low-intensity happy performance."
+                "(toLaugh/video/fromLaugh). This plate opens on the reference artwork and warps into a smile."
             )
     CATALOG_PATH.write_text(json.dumps(data, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
     text = CONTRACT_PATH.read_text(encoding="utf-8")
+    old = (
+        "Every other emotion is an original performance from `tools/render_emotions.py`: "
+        "a soft-shaded pear mascot on its own skeleton, with its own eyes, mouth, and motion arc. "
+        "Those frames are not crops, reverses, or renames of the legacy plates."
+    )
+    new = (
+        "Every other emotion is a 2D warp of `source/emotion/reference-neutral.jpg` "
+        "by `tools/render_emotions.py`. Frame 0 of each new clip (`animations/<id>`, `<id>_in`, `<id>_out`) "
+        "is `source/emotion/neutral-reference.png`, that photo scaled onto the 420×560 plate. "
+        "Later frames keep those pixels: the body squashes, leans, and nods, and the eye, mouth, blush, and tears "
+        "are painted with colors taken from the photo. "
+        "They are not crops, reverses, or renames of the legacy plates, and they are not a newly shaded character."
+    )
+    if old in text:
+        text = text.replace(old, new, 1)
+    elif new not in text:
+        raise SystemExit("contract performance paragraph was not found")
     start = text.find("<!-- EMOTION_TABLE_START -->")
     end = text.find("<!-- EMOTION_TABLE_END -->")
     if start < 0 or end < 0:
@@ -1381,25 +874,43 @@ def sync_catalog():
         )
     start = text.find("\n", start) + 1
     CONTRACT_PATH.write_text(text[:start] + "\n".join(rows) + "\n" + text[end:], encoding="utf-8")
-    return data
+
+
+def render_peaks(parts):
+    out = Path("/tmp/emotion-preview/ref-peaks")
+    out.mkdir(parents=True, exist_ok=True)
+    canon = Image.fromarray(parts["canon"], "RGBA")
+    canon.save(out / "_frame0.png")
+    images = [("_frame0", canon)]
+    for emotion_id, (peak, _desc) in PEAKS.items():
+        arr = render_pose(parts, peak)
+        im = Image.fromarray(arr, "RGBA")
+        im.save(out / f"{emotion_id}.png")
+        images.append((emotion_id, im))
+    cols = 6
+    cell_w, cell_h = 150, 214
+    sheet = Image.new("RGB", (cols * cell_w, ((len(images) + cols - 1) // cols) * cell_h), (244, 244, 246))
+    draw = ImageDraw.Draw(sheet)
+    for i, (label, im) in enumerate(images):
+        paste_cell(sheet, draw, im, i, cell_w, cell_h, label)
+    sheet.save("/tmp/emotion-preview/ref-peaks-sheet.png", quality=92)
+    print("wrote /tmp/emotion-preview/ref-peaks-sheet.png")
+    print("anchors", {k: parts["anchors"][k] for k in ("eye", "mouth", "hands", "feet", "top", "body_cx", "neck")})
 
 
 def main():
     mode = sys.argv[1] if len(sys.argv) > 1 else "all"
+    canon = build_canonical()
+    parts = build_parts(np.array(canon))
+    print("anchors", parts["anchors"]["eye"], parts["anchors"]["mouth"], parts["anchors"]["hands"])
     if mode == "peaks":
-        images = render_peaks(Path("/tmp/emotion-preview/peaks"))
-        contact_sheet(images, Path("/tmp/emotion-preview/peaks-sheet.png"))
+        render_peaks(parts)
         return
     if mode == "all":
-        render_all()
+        render_all(parts)
         sync_catalog()
-        images = []
-        for emotion_id in PERFORMANCES:
-            images.append((emotion_id, Image.open(ANIM / emotion_id / "0004.png")))
-        contact_sheet(images, ROOT / "source" / "emotion" / "contact-sheet.png")
-        contact_sheet(images, Path("/opt/cursor/artifacts/emotion-contact-sheet.png"))
-        motion_sheet(ROOT / "source" / "emotion" / "motion-sheet.png")
-        motion_sheet(Path("/opt/cursor/artifacts/emotion-motion-sheet.png"))
+        contact_sheet(parts)
+        motion_sheet()
         return
     raise SystemExit(f"unknown mode {mode}")
 
