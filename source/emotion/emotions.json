@@ -6,15 +6,11 @@
       "priority": "normal",
       "legacy": false,
       "clip": "animations/happy",
-      "transition_in": "surprised_in",
-      "transition_out": "surprised_out",
-      "source": "surprised",
-      "start": 8,
-      "step": 2,
-      "count": 10,
-      "reverse": false,
-      "fps": 24,
-      "note": "Low intensity returns to idle. Intensity >= 0.6 still plays the embedded full laugh (toLaugh/video/fromLaugh)."
+      "transition_in": "happy_in",
+      "transition_out": "happy_out",
+      "fps": 12,
+      "note": "Low intensity returns to idle. Intensity >= 0.6 still plays the embedded full laugh (toLaugh/video/fromLaugh). This plate is the distinct low-intensity happy performance.",
+      "production": "Original soft-3D skeleton performance from tools/render_emotions.py. Arms lifted on a diagonal, shut smile-eyes, toothy grin, gentle bounce. Not a crop, reverse, or rename of a legacy plate."
     },
     {
       "id": "surprised",
@@ -67,14 +63,10 @@
       "priority": "normal",
       "legacy": false,
       "clip": "animations/proud",
-      "transition_in": "angry_in",
-      "transition_out": "angry_out",
-      "source": "angry",
-      "start": 0,
-      "step": 1,
-      "count": 10,
-      "reverse": false,
-      "fps": 18
+      "transition_in": "proud_in",
+      "transition_out": "proud_out",
+      "fps": 12,
+      "production": "Original soft-3D skeleton performance from tools/render_emotions.py. Both hands on hips, chest tall, chin up, one brow raised, smirk. Not a crop, reverse, or rename of a legacy plate."
     },
     {
       "id": "sleepy",
@@ -82,14 +74,10 @@
       "priority": "low",
       "legacy": false,
       "clip": "animations/sleepy",
-      "transition_in": "sad_in",
-      "transition_out": "sad_out",
-      "source": "sad",
-      "start": 88,
-      "step": 2,
-      "count": 10,
-      "reverse": true,
-      "fps": 12
+      "transition_in": "sleepy_in",
+      "transition_out": "sleepy_out",
+      "fps": 12,
+      "production": "Original soft-3D skeleton performance from tools/render_emotions.py. Arms hanging, slouch and sway, heavy lids, yawn, floating z's. Not a crop, reverse, or rename of a legacy plate."
     },
     {
       "id": "love",
@@ -97,14 +85,10 @@
       "priority": "normal",
       "legacy": false,
       "clip": "animations/love",
-      "transition_in": "shy_in",
-      "transition_out": "shy_out",
-      "source": "shy",
-      "start": 28,
-      "step": 2,
-      "count": 10,
-      "reverse": false,
-      "fps": 18
+      "transition_in": "love_in",
+      "transition_out": "love_out",
+      "fps": 12,
+      "production": "Original soft-3D skeleton performance from tools/render_emotions.py. Self-hug across the chest, heart-shaped eyes, heavy blush, rising hearts. Not a crop, reverse, or rename of a legacy plate."
     },
     {
       "id": "scared",
@@ -112,14 +96,10 @@
       "priority": "high",
       "legacy": false,
       "clip": "animations/scared",
-      "transition_in": "surprised_in",
-      "transition_out": "surprised_out",
-      "source": "surprised",
-      "start": 0,
-      "step": 1,
-      "count": 10,
-      "reverse": false,
-      "fps": 24
+      "transition_in": "scared_in",
+      "transition_out": "scared_out",
+      "fps": 12,
+      "production": "Original soft-3D skeleton performance from tools/render_emotions.py. Crouch with both arms thrown up, huge white eyes, round mouth, tremble. Not a crop, reverse, or rename of a legacy plate."
     },
     {
       "id": "excited",
@@ -127,14 +107,10 @@
       "priority": "high",
       "legacy": false,
       "clip": "animations/excited",
-      "transition_in": "surprised_in",
-      "transition_out": "surprised_out",
-      "source": "surprised",
-      "start": 18,
-      "step": 3,
-      "count": 10,
-      "reverse": false,
-      "fps": 24
+      "transition_in": "excited_in",
+      "transition_out": "excited_out",
+      "fps": 12,
+      "production": "Original soft-3D skeleton performance from tools/render_emotions.py. Fists pump near the shoulders, body stretches, wide eyes, big grin. Not a crop, reverse, or rename of a legacy plate."
     },
     {
       "id": "bored",
@@ -142,14 +118,10 @@
       "priority": "low",
       "legacy": false,
       "clip": "animations/bored",
-      "transition_in": "confused_in",
-      "transition_out": "confused_out",
-      "source": "confused",
-      "start": 58,
-      "step": 2,
-      "count": 10,
-      "reverse": false,
-      "fps": 12
+      "transition_in": "bored_in",
+      "transition_out": "bored_out",
+      "fps": 12,
+      "production": "Original soft-3D skeleton performance from tools/render_emotions.py. Lean onto one hand on the cheek, other arm hanging, half-lidded flat mouth. Not a crop, reverse, or rename of a legacy plate."
     },
     {
       "id": "embarrassed",
@@ -157,14 +129,10 @@
       "priority": "normal",
       "legacy": false,
       "clip": "animations/embarrassed",
-      "transition_in": "shy_in",
-      "transition_out": "shy_out",
-      "source": "shy",
-      "start": 6,
-      "step": 2,
-      "count": 10,
-      "reverse": false,
-      "fps": 18
+      "transition_in": "embarrassed_in",
+      "transition_out": "embarrassed_out",
+      "fps": 12,
+      "production": "Original soft-3D skeleton performance from tools/render_emotions.py. Both hands hide the face, full blush, one eye peeks, sweat drop. Not a crop, reverse, or rename of a legacy plate."
     },
     {
       "id": "curious",
@@ -172,14 +140,10 @@
       "priority": "normal",
       "legacy": false,
       "clip": "animations/curious",
-      "transition_in": "confused_in",
-      "transition_out": "confused_out",
-      "source": "confused",
-      "start": 4,
-      "step": 2,
-      "count": 10,
-      "reverse": false,
-      "fps": 18
+      "transition_in": "curious_in",
+      "transition_out": "curious_out",
+      "fps": 12,
+      "production": "Original soft-3D skeleton performance from tools/render_emotions.py. Head tilt, one arm points up, mismatched brows, one wide eye, small o. Not a crop, reverse, or rename of a legacy plate."
     },
     {
       "id": "relieved",
@@ -187,14 +151,10 @@
       "priority": "low",
       "legacy": false,
       "clip": "animations/relieved",
-      "transition_in": "sad_in",
-      "transition_out": "sad_out",
-      "source": "sad",
-      "start": 72,
-      "step": 3,
-      "count": 10,
-      "reverse": true,
-      "fps": 18
+      "transition_in": "relieved_in",
+      "transition_out": "relieved_out",
+      "fps": 12,
+      "production": "Original soft-3D skeleton performance from tools/render_emotions.py. Hand on the chest, exhale squash, eyes closed in a soft smile. Not a crop, reverse, or rename of a legacy plate."
     },
     {
       "id": "disappointed",
@@ -202,14 +162,10 @@
       "priority": "normal",
       "legacy": false,
       "clip": "animations/disappointed",
-      "transition_in": "sad_in",
-      "transition_out": "sad_out",
-      "source": "sad",
-      "start": 16,
-      "step": 2,
-      "count": 10,
-      "reverse": false,
-      "fps": 15
+      "transition_in": "disappointed_in",
+      "transition_out": "disappointed_out",
+      "fps": 12,
+      "production": "Original soft-3D skeleton performance from tools/render_emotions.py. Head bowed, arms limp, knees in, frown and sad brows. Not a crop, reverse, or rename of a legacy plate."
     },
     {
       "id": "grateful",
@@ -217,14 +173,10 @@
       "priority": "normal",
       "legacy": false,
       "clip": "animations/grateful",
-      "transition_in": "shy_in",
-      "transition_out": "shy_out",
-      "source": "shy",
-      "start": 48,
-      "step": 2,
-      "count": 10,
-      "reverse": false,
-      "fps": 18
+      "transition_in": "grateful_in",
+      "transition_out": "grateful_out",
+      "fps": 12,
+      "production": "Original soft-3D skeleton performance from tools/render_emotions.py. Small bow, palms pressed together, eyes closed, warm smile. Not a crop, reverse, or rename of a legacy plate."
     },
     {
       "id": "worried",
@@ -232,14 +184,10 @@
       "priority": "normal",
       "legacy": false,
       "clip": "animations/worried",
-      "transition_in": "sad_in",
-      "transition_out": "sad_out",
-      "source": "sad",
-      "start": 36,
-      "step": 1,
-      "count": 10,
-      "reverse": false,
-      "fps": 18
+      "transition_in": "worried_in",
+      "transition_out": "worried_out",
+      "fps": 12,
+      "production": "Original soft-3D skeleton performance from tools/render_emotions.py. Hands wrung at the stomach, inner brows up, eyes dart, small frown. Not a crop, reverse, or rename of a legacy plate."
     },
     {
       "id": "smug",
@@ -247,14 +195,10 @@
       "priority": "normal",
       "legacy": false,
       "clip": "animations/smug",
-      "transition_in": "angry_in",
-      "transition_out": "angry_out",
-      "source": "angry",
-      "start": 2,
-      "step": 2,
-      "count": 10,
-      "reverse": false,
-      "fps": 18
+      "transition_in": "smug_in",
+      "transition_out": "smug_out",
+      "fps": 12,
+      "production": "Original soft-3D skeleton performance from tools/render_emotions.py. Lean back, one hand behind the head, one on the hip, asymmetric smirk. Not a crop, reverse, or rename of a legacy plate."
     },
     {
       "id": "crying",
@@ -262,14 +206,10 @@
       "priority": "high",
       "legacy": false,
       "clip": "animations/crying",
-      "transition_in": "sad_in",
-      "transition_out": "sad_out",
-      "source": "sad",
-      "start": 52,
-      "step": 1,
-      "count": 10,
-      "reverse": false,
-      "fps": 12
+      "transition_in": "crying_in",
+      "transition_out": "crying_out",
+      "fps": 12,
+      "production": "Original soft-3D skeleton performance from tools/render_emotions.py. Hands on the cheeks, squeezed eyes, open sob, falling tears. Not a crop, reverse, or rename of a legacy plate."
     },
     {
       "id": "wronged",
@@ -277,14 +217,10 @@
       "priority": "normal",
       "legacy": false,
       "clip": "animations/wronged",
-      "transition_in": "shy_in",
-      "transition_out": "shy_out",
-      "source": "sad",
-      "start": 24,
-      "step": 2,
-      "count": 10,
-      "reverse": false,
-      "fps": 15
+      "transition_in": "wronged_in",
+      "transition_out": "wronged_out",
+      "fps": 12,
+      "production": "Original soft-3D skeleton performance from tools/render_emotions.py. Hip cocked, arms folded tight, side-eye, pout, a single tear line. Not a crop, reverse, or rename of a legacy plate."
     },
     {
       "id": "cheer",
@@ -292,14 +228,10 @@
       "priority": "high",
       "legacy": false,
       "clip": "animations/cheer",
-      "transition_in": "surprised_in",
-      "transition_out": "surprised_out",
-      "source": "surprised",
-      "start": 28,
-      "step": 2,
-      "count": 10,
-      "reverse": false,
-      "fps": 24
+      "transition_in": "cheer_in",
+      "transition_out": "cheer_out",
+      "fps": 12,
+      "production": "Original soft-3D skeleton performance from tools/render_emotions.py. Both arms straight up in a V, bounce, happy eyes, open cheer mouth. Not a crop, reverse, or rename of a legacy plate."
     },
     {
       "id": "dizzy",
@@ -307,14 +239,10 @@
       "priority": "normal",
       "legacy": false,
       "clip": "animations/dizzy",
-      "transition_in": "confused_in",
-      "transition_out": "confused_out",
-      "source": "confused",
-      "start": 12,
-      "step": 4,
-      "count": 10,
-      "reverse": true,
-      "fps": 18
+      "transition_in": "dizzy_in",
+      "transition_out": "dizzy_out",
+      "fps": 12,
+      "production": "Original soft-3D skeleton performance from tools/render_emotions.py. Body rocks side to side, limp arms, spiral eyes, wavy mouth. Not a crop, reverse, or rename of a legacy plate."
     },
     {
       "id": "focused",
@@ -322,14 +250,10 @@
       "priority": "low",
       "legacy": false,
       "clip": "animations/focused",
-      "transition_in": "confused_in",
-      "transition_out": "confused_out",
-      "source": "confused",
-      "start": 36,
-      "step": 1,
-      "count": 10,
-      "reverse": false,
-      "fps": 12
+      "transition_in": "focused_in",
+      "transition_out": "focused_out",
+      "fps": 12,
+      "production": "Original soft-3D skeleton performance from tools/render_emotions.py. Both hands frame the eyes like a visor, brows down, small steady eyes, flat mouth. Not a crop, reverse, or rename of a legacy plate."
     },
     {
       "id": "greet",
@@ -337,14 +261,10 @@
       "priority": "normal",
       "legacy": false,
       "clip": "animations/greet",
-      "transition_in": "shy_in",
-      "transition_out": "shy_out",
-      "source": "shy",
-      "start": 0,
-      "step": 1,
-      "count": 10,
-      "reverse": false,
-      "fps": 18
+      "transition_in": "greet_in",
+      "transition_out": "greet_out",
+      "fps": 12,
+      "production": "Original soft-3D skeleton performance from tools/render_emotions.py. One arm waves overhead, the other rests in front, open grin. Not a crop, reverse, or rename of a legacy plate."
     },
     {
       "id": "agree",
@@ -352,14 +272,10 @@
       "priority": "low",
       "legacy": false,
       "clip": "animations/agree",
-      "transition_in": "confused_in",
-      "transition_out": "confused_out",
-      "source": "confused",
-      "start": 22,
-      "step": 2,
-      "count": 10,
-      "reverse": false,
-      "fps": 18
+      "transition_in": "agree_in",
+      "transition_out": "agree_out",
+      "fps": 12,
+      "production": "Original soft-3D skeleton performance from tools/render_emotions.py. Nod, one hand gives a thumbs-up, smile. Not a crop, reverse, or rename of a legacy plate."
     },
     {
       "id": "refuse",
@@ -367,14 +283,10 @@
       "priority": "high",
       "legacy": false,
       "clip": "animations/refuse",
-      "transition_in": "angry_in",
-      "transition_out": "angry_out",
-      "source": "angry",
-      "start": 10,
-      "step": 2,
-      "count": 10,
-      "reverse": false,
-      "fps": 18
+      "transition_in": "refuse_in",
+      "transition_out": "refuse_out",
+      "fps": 12,
+      "production": "Original soft-3D skeleton performance from tools/render_emotions.py. Both palms pushed forward, head shakes, brows down, frown. Not a crop, reverse, or rename of a legacy plate."
     },
     {
       "id": "ponder",
@@ -382,14 +294,10 @@
       "priority": "low",
       "legacy": false,
       "clip": "animations/ponder",
-      "transition_in": "confused_in",
-      "transition_out": "confused_out",
-      "source": "confused",
-      "start": 44,
-      "step": 1,
-      "count": 10,
-      "reverse": true,
-      "fps": 12
+      "transition_in": "ponder_in",
+      "transition_out": "ponder_out",
+      "fps": 12,
+      "production": "Original soft-3D skeleton performance from tools/render_emotions.py. One hand rests on top of the head, eyes look up, the other arm is behind the back. Not a crop, reverse, or rename of a legacy plate."
     },
     {
       "id": "annoyed",
@@ -397,14 +305,10 @@
       "priority": "normal",
       "legacy": false,
       "clip": "animations/annoyed",
-      "transition_in": "angry_in",
-      "transition_out": "angry_out",
-      "source": "angry",
-      "start": 16,
-      "step": 1,
-      "count": 10,
-      "reverse": false,
-      "fps": 18
+      "transition_in": "annoyed_in",
+      "transition_out": "annoyed_out",
+      "fps": 12,
+      "production": "Original soft-3D skeleton performance from tools/render_emotions.py. Arms crossed, one foot taps, eyes rolled up, tight mouth. Not a crop, reverse, or rename of a legacy plate."
     },
     {
       "id": "celebrate",
@@ -412,14 +316,10 @@
       "priority": "high",
       "legacy": false,
       "clip": "animations/celebrate",
-      "transition_in": "surprised_in",
-      "transition_out": "surprised_out",
-      "source": "surprised",
-      "start": 36,
-      "step": 2,
-      "count": 10,
-      "reverse": false,
-      "fps": 24
+      "transition_in": "celebrate_in",
+      "transition_out": "celebrate_out",
+      "fps": 12,
+      "production": "Original soft-3D skeleton performance from tools/render_emotions.py. Hands meet overhead in a clap, happy eyes, sparkles around the head. Not a crop, reverse, or rename of a legacy plate."
     },
     {
       "id": "hug",
@@ -427,14 +327,10 @@
       "priority": "normal",
       "legacy": false,
       "clip": "animations/hug",
-      "transition_in": "shy_in",
-      "transition_out": "shy_out",
-      "source": "shy",
-      "start": 52,
-      "step": 1,
-      "count": 10,
-      "reverse": false,
-      "fps": 15
+      "transition_in": "hug_in",
+      "transition_out": "hug_out",
+      "fps": 12,
+      "production": "Original soft-3D skeleton performance from tools/render_emotions.py. Both arms come forward with open hands gathered at the belly, blush, closed smile. Not a crop, reverse, or rename of a legacy plate."
     },
     {
       "id": "shocked",
@@ -442,14 +338,10 @@
       "priority": "high",
       "legacy": false,
       "clip": "animations/shocked",
-      "transition_in": "surprised_in",
-      "transition_out": "surprised_out",
-      "source": "surprised",
-      "start": 1,
-      "step": 1,
-      "count": 10,
-      "reverse": false,
-      "fps": 30
+      "transition_in": "shocked_in",
+      "transition_out": "shocked_out",
+      "fps": 12,
+      "production": "Original soft-3D skeleton performance from tools/render_emotions.py. Rigid arms straight out, body leans back, giant eyes, round mouth. Not a crop, reverse, or rename of a legacy plate."
     }
   ]
 }

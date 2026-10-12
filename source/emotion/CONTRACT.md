@@ -2,7 +2,7 @@
 
 Locomotion owns the body: idle, walk, run, jump, and attack, including displacement and facing. Emotion is a facial/upper overlay. The two tracks do not share one exclusive animator clip slot.
 
-The legacy desktop player still draws full-character PNG plates from `animations/`. Those plates are the existing frame pipeline (same canvas, fps family, and idle in/out transitions). The scheduler below does not apply root motion on top of them. New plates are short windows of the reviewed clips, played between that clip family's existing `*_in` and `*_out` transitions.
+The legacy desktop player still draws full-character PNG plates from `animations/`. Legacy emotions keep their original plates and transitions (`angry`, `confused`, `sad`, `shy`, `surprised`, plus the embedded happy laugh). Every other emotion is an original performance from `tools/render_emotions.py`: a soft-shaded pear mascot on its own skeleton, with its own eyes, mouth, and motion arc. Those frames are not crops, reverses, or renames of the legacy plates. Each new clip has its own `*_in` and `*_out`. Feet stay on the ground line. The scheduler does not add root motion.
 
 ## Entry points
 
@@ -68,36 +68,36 @@ Canonical data is `source/emotion/emotions.json`. Clip paths are relative to the
 | id | 中文 | priority | clip | transition in | transition out |
 | --- | --- | --- | --- | --- | --- |
 | neutral | 待机 | low | （无片段，回到待机） |  |  |
-| happy | 开心 | normal | `animations/happy` | `surprised_in` | `surprised_out` |
+| happy | 开心 | normal | `animations/happy` | `happy_in` | `happy_out` |
 | surprised | 惊讶 | high | `animations/surprised` | `surprised_in` | `surprised_out` |
 | confused | 疑惑 | normal | `animations/confused` | `confused_in` | `confused_out` |
 | shy | 害羞 | normal | `animations/shy` | `shy_in` | `shy_out` |
 | sad | 伤心 | normal | `animations/sad` | `sad_in` | `sad_out` |
 | angry | 生气 | high | `animations/angry` | `angry_in` | `angry_out` |
-| proud | 得意 | normal | `animations/proud` | `angry_in` | `angry_out` |
-| sleepy | 困倦 | low | `animations/sleepy` | `sad_in` | `sad_out` |
-| love | 喜爱 | normal | `animations/love` | `shy_in` | `shy_out` |
-| scared | 害怕 | high | `animations/scared` | `surprised_in` | `surprised_out` |
-| excited | 兴奋 | high | `animations/excited` | `surprised_in` | `surprised_out` |
-| bored | 无聊 | low | `animations/bored` | `confused_in` | `confused_out` |
-| embarrassed | 尴尬 | normal | `animations/embarrassed` | `shy_in` | `shy_out` |
-| curious | 好奇 | normal | `animations/curious` | `confused_in` | `confused_out` |
-| relieved | 放松 | low | `animations/relieved` | `sad_in` | `sad_out` |
-| disappointed | 失望 | normal | `animations/disappointed` | `sad_in` | `sad_out` |
-| grateful | 感谢 | normal | `animations/grateful` | `shy_in` | `shy_out` |
-| worried | 担心 | normal | `animations/worried` | `sad_in` | `sad_out` |
-| smug | 傲娇 | normal | `animations/smug` | `angry_in` | `angry_out` |
-| crying | 哭泣 | high | `animations/crying` | `sad_in` | `sad_out` |
-| wronged | 委屈 | normal | `animations/wronged` | `shy_in` | `shy_out` |
-| cheer | 欢呼 | high | `animations/cheer` | `surprised_in` | `surprised_out` |
-| dizzy | 晕乎 | normal | `animations/dizzy` | `confused_in` | `confused_out` |
-| focused | 专注 | low | `animations/focused` | `confused_in` | `confused_out` |
-| greet | 打招呼 | normal | `animations/greet` | `shy_in` | `shy_out` |
-| agree | 赞同 | low | `animations/agree` | `confused_in` | `confused_out` |
-| refuse | 拒绝 | high | `animations/refuse` | `angry_in` | `angry_out` |
-| ponder | 思索 | low | `animations/ponder` | `confused_in` | `confused_out` |
-| annoyed | 不悦 | normal | `animations/annoyed` | `angry_in` | `angry_out` |
-| celebrate | 庆祝 | high | `animations/celebrate` | `surprised_in` | `surprised_out` |
-| hug | 拥抱 | normal | `animations/hug` | `shy_in` | `shy_out` |
-| shocked | 震住 | high | `animations/shocked` | `surprised_in` | `surprised_out` |
+| proud | 得意 | normal | `animations/proud` | `proud_in` | `proud_out` |
+| sleepy | 困倦 | low | `animations/sleepy` | `sleepy_in` | `sleepy_out` |
+| love | 喜爱 | normal | `animations/love` | `love_in` | `love_out` |
+| scared | 害怕 | high | `animations/scared` | `scared_in` | `scared_out` |
+| excited | 兴奋 | high | `animations/excited` | `excited_in` | `excited_out` |
+| bored | 无聊 | low | `animations/bored` | `bored_in` | `bored_out` |
+| embarrassed | 尴尬 | normal | `animations/embarrassed` | `embarrassed_in` | `embarrassed_out` |
+| curious | 好奇 | normal | `animations/curious` | `curious_in` | `curious_out` |
+| relieved | 放松 | low | `animations/relieved` | `relieved_in` | `relieved_out` |
+| disappointed | 失望 | normal | `animations/disappointed` | `disappointed_in` | `disappointed_out` |
+| grateful | 感谢 | normal | `animations/grateful` | `grateful_in` | `grateful_out` |
+| worried | 担心 | normal | `animations/worried` | `worried_in` | `worried_out` |
+| smug | 傲娇 | normal | `animations/smug` | `smug_in` | `smug_out` |
+| crying | 哭泣 | high | `animations/crying` | `crying_in` | `crying_out` |
+| wronged | 委屈 | normal | `animations/wronged` | `wronged_in` | `wronged_out` |
+| cheer | 欢呼 | high | `animations/cheer` | `cheer_in` | `cheer_out` |
+| dizzy | 晕乎 | normal | `animations/dizzy` | `dizzy_in` | `dizzy_out` |
+| focused | 专注 | low | `animations/focused` | `focused_in` | `focused_out` |
+| greet | 打招呼 | normal | `animations/greet` | `greet_in` | `greet_out` |
+| agree | 赞同 | low | `animations/agree` | `agree_in` | `agree_out` |
+| refuse | 拒绝 | high | `animations/refuse` | `refuse_in` | `refuse_out` |
+| ponder | 思索 | low | `animations/ponder` | `ponder_in` | `ponder_out` |
+| annoyed | 不悦 | normal | `animations/annoyed` | `annoyed_in` | `annoyed_out` |
+| celebrate | 庆祝 | high | `animations/celebrate` | `celebrate_in` | `celebrate_out` |
+| hug | 拥抱 | normal | `animations/hug` | `hug_in` | `hug_out` |
+| shocked | 震住 | high | `animations/shocked` | `shocked_in` | `shocked_out` |
 <!-- EMOTION_TABLE_END -->

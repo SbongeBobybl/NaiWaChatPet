@@ -1,0 +1,58 @@
+{
+  "name": "proud_in",
+  "emotion": "proud_in",
+  "fps": 12,
+  "frameCount": 4,
+  "loop": false,
+  "priority": 25,
+  "mouthAnchor": {
+    "frame": 0,
+    "x": 214.0,
+    "y": 167.56
+  },
+  "mouthKeyframes": [
+    {
+      "frame": 0,
+      "x": 214.0,
+      "y": 167.56
+    },
+    {
+      "frame": 2,
+      "x": 214.0,
+      "y": 152.54
+    },
+    {
+      "frame": 3,
+      "x": 214.0,
+      "y": 145.6
+    }
+  ],
+  "transitionIn": "",
+  "transitionOut": "",
+  "canvas": {
+    "width": 420,
+    "height": 560
+  },
+  "groundY": 540,
+  "frames": [
+    {
+      "file": "0000.png",
+      "sha256": "1195b713b13298e2ab159312f77f56fec87d8c679e30b16781ee5c4676278f17"
+    },
+    {
+      "file": "0001.png",
+      "sha256": "670617ede7679d7d89d94c5ed166a4b9deb675d45ce372054eb9589bce820a3d"
+    },
+    {
+      "file": "0002.png",
+      "sha256": "cdd28598047adca2fdb625547d51df53705f2bd1d34561808c2c784a0f3e754b"
+    },
+    {
+      "file": "0003.png",
+      "sha256": "63f1d7c94b4465cd0a74419e9e7f196e21bccbe9a16574e7d0d7b924516890f8"
+    }
+  ],
+  "reviewed": true,
+  "sourceSha256": "555fdaa2a62cfb3b0f6ad38caa3a28e110ab782673dccc41fe836152312d8257",
+  "issues": []
+}

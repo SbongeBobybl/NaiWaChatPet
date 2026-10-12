@@ -4,6 +4,7 @@ import (
 	"crypto/sha256"
 	"encoding/hex"
 	"encoding/json"
+	"image/png"
 	"os"
 	"path/filepath"
 	"runtime"
@@ -282,6 +283,162 @@ func TestUnknownEmotionRejected(t *testing.T) {
 	if d.Reason != "unknown_emotion" {
 		t.Fatalf("got %+v", d)
 	}
+}
+
+func TestLegacyPlatesUnchanged(t *testing.T) {
+	root := repoRoot(t)
+	want := map[string]string{
+		"angry":     "1d0b804dc9f5f58fdec1b9e1da5dae3e3c20472f0320b5fd6339f024c5e2a909",
+		"confused":  "af6c414e62f18641b5da34079355306b4b3a65bb69dcfc6162316f5f0eabce8a",
+		"sad":       "51debe4d6dd13a65945a7397b2b4977873c5879fe4e8634c52bc79ec1c0427ff",
+		"shy":       "97fc3fc1599e0a35671677a7e0d730f09ac7e11d808220ffd88b6e56ec80ced3",
+		"surprised": "8a1032f8582d099bad7218a8012d1c38fe0685dbcaabe8257b4d951a99124c2b",
+	}
+	for id, sum := range want {
+		b, err := os.ReadFile(filepath.Join(root, "animations", id, "0000.png"))
+		if err != nil {
+			t.Fatal(err)
+		}
+		got := sha256.Sum256(b)
+		if hex.EncodeToString(got[:]) != sum {
+			t.Fatalf("%s/0000.png changed", id)
+		}
+	}
+}
+
+func TestNewPerformancesAreNotLegacyCrops(t *testing.T) {
+	root := repoRoot(t)
+	ems, err := Catalog()
+	if err != nil {
+		t.Fatal(err)
+	}
+	legacyDir := map[string]bool{}
+	for _, em := range ems {
+		if em.Legacy {
+			legacyDir[em.ID] = true
+			legacyDir[em.TransitionIn] = true
+			legacyDir[em.TransitionOut] = true
+		}
+	}
+	legacySHA := map[string]struct{}{}
+	anim := filepath.Join(root, "animations")
+	entries, err := os.ReadDir(anim)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, entry := range entries {
+		if !entry.IsDir() || !legacyDir[entry.Name()] {
+			continue
+		}
+		frames, err := filepath.Glob(filepath.Join(anim, entry.Name(), "*.png"))
+		if err != nil {
+			t.Fatal(err)
+		}
+		for _, frame := range frames {
+			b, err := os.ReadFile(frame)
+			if err != nil {
+				t.Fatal(err)
+			}
+			sum := sha256.Sum256(b)
+			legacySHA[hex.EncodeToString(sum[:])] = struct{}{}
+		}
+	}
+	sigs := map[string][]float64{}
+	for _, em := range ems {
+		if em.Legacy {
+			if em.Source != "" || em.Count != 0 {
+				t.Fatalf("legacy %s still has crop fields", em.ID)
+			}
+			continue
+		}
+		if em.Source != "" || em.Count != 0 || em.Step != 0 {
+			t.Fatalf("%s still describes a legacy crop", em.ID)
+		}
+		if em.Production == "" {
+			t.Fatalf("%s missing production method", em.ID)
+		}
+		if em.TransitionIn != em.ID+"_in" || em.TransitionOut != em.ID+"_out" {
+			t.Fatalf("%s should own its transitions, got %s %s", em.ID, em.TransitionIn, em.TransitionOut)
+		}
+		for _, dir := range []string{em.ID, em.ID + "_in", em.ID + "_out"} {
+			frames, err := filepath.Glob(filepath.Join(anim, dir, "*.png"))
+			if err != nil || len(frames) == 0 {
+				t.Fatalf("%s: %v frames=%d", dir, err, len(frames))
+			}
+			for _, frame := range frames {
+				b, err := os.ReadFile(frame)
+				if err != nil {
+					t.Fatal(err)
+				}
+				sum := sha256.Sum256(b)
+				if _, ok := legacySHA[hex.EncodeToString(sum[:])]; ok {
+					t.Fatalf("%s reuses a legacy frame", frame)
+				}
+			}
+		}
+		sigs[em.ID] = colorSig(t, filepath.Join(anim, em.ID, "0004.png"))
+	}
+	var closestA, closestB string
+	closest := 9.0
+	ids := make([]string, 0, len(sigs))
+	for id := range sigs {
+		ids = append(ids, id)
+	}
+	for i, a := range ids {
+		for _, b := range ids[i+1:] {
+			d := meanAbs(sigs[a], sigs[b])
+			if d < closest {
+				closest = d
+				closestA, closestB = a, b
+			}
+		}
+	}
+	// Coarse 18x24 samples. Identical plates score 0. Distinct performances
+	// on this rig stay above ~0.01; see contact-sheet.png for the glance test.
+	if closest < 0.008 {
+		t.Fatalf("mid-frames too alike: %s vs %s distance %.4f", closestA, closestB, closest)
+	}
+	t.Logf("closest new mid-frames %s vs %s distance %.4f", closestA, closestB, closest)
+}
+
+func colorSig(t *testing.T, path string) []float64 {
+	t.Helper()
+	f, err := os.Open(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer f.Close()
+	im, err := png.Decode(f)
+	if err != nil {
+		t.Fatal(err)
+	}
+	b := im.Bounds()
+	const gw, gh = 18, 24
+	sig := make([]float64, 0, gw*gh*4)
+	for y := 0; y < gh; y++ {
+		for x := 0; x < gw; x++ {
+			px := b.Min.X + (x*b.Dx())/gw + b.Dx()/(gw*2)
+			py := b.Min.Y + (y*b.Dy())/gh + b.Dy()/(gh*2)
+			r, g, bl, a := im.At(px, py).RGBA()
+			sig = append(sig, float64(r)/65535, float64(g)/65535, float64(bl)/65535, float64(a)/65535)
+		}
+	}
+	return sig
+}
+
+func meanAbs(a, b []float64) float64 {
+	if len(a) != len(b) || len(a) == 0 {
+		return 0
+	}
+	var sum float64
+	for i := range a {
+		d := a[i] - b[i]
+		if d < 0 {
+			d = -d
+		}
+		sum += d
+	}
+	return sum / float64(len(a))
 }
 
 func repoRoot(t *testing.T) string {

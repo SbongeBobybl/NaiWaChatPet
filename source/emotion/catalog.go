@@ -48,6 +48,7 @@ type Emotion struct {
 	Reverse       bool   `json:"reverse,omitempty"`
 	FPS           int    `json:"fps,omitempty"`
 	Note          string `json:"note,omitempty"`
+	Production    string `json:"production,omitempty"`
 }
 
 type catalogFile struct {

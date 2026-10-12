@@ -1,0 +1,58 @@
+{
+  "name": "dizzy_in",
+  "emotion": "dizzy_in",
+  "fps": 12,
+  "frameCount": 4,
+  "loop": false,
+  "priority": 25,
+  "mouthAnchor": {
+    "frame": 0,
+    "x": 218.31,
+    "y": 170.44
+  },
+  "mouthKeyframes": [
+    {
+      "frame": 0,
+      "x": 218.31,
+      "y": 170.44
+    },
+    {
+      "frame": 2,
+      "x": 240.81,
+      "y": 171.92
+    },
+    {
+      "frame": 3,
+      "x": 251.0,
+      "y": 173.3
+    }
+  ],
+  "transitionIn": "",
+  "transitionOut": "",
+  "canvas": {
+    "width": 420,
+    "height": 560
+  },
+  "groundY": 540,
+  "frames": [
+    {
+      "file": "0000.png",
+      "sha256": "9e4738a10b812c1c76cff526cb097d3721cc41e98abd5f0e8eb4227c0fa9bde7"
+    },
+    {
+      "file": "0001.png",
+      "sha256": "5405f0b4f24044e6974a810970c97fc5ba501242e02bc16841d73e90bb031d94"
+    },
+    {
+      "file": "0002.png",
+      "sha256": "4448910ce3a5eeca2398d780ffbe1d5a93b7e45cdcd5fde64320e54ee163d74b"
+    },
+    {
+      "file": "0003.png",
+      "sha256": "f9427317393d83713065c869330ceacf94bdaea32ad9b4a07a7b46a36b45b360"
+    }
+  ],
+  "reviewed": true,
+  "sourceSha256": "fe81ecb37f99dc03a11cf0286181027bdf370b83fdb573dda382b5130b4ad358",
+  "issues": []
+}

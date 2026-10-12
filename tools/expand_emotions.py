@@ -1,15 +1,14 @@
 #!/usr/bin/env python3
-"""Generate variant emotion plates and extend the legacy client's forced set.
+"""Legacy helper for the shipped client's forced-set patch.
 
-New plates reuse reviewed PNG frames (window, stride, reverse, fps) and the
-existing in/out transitions. The Go scheduler in source/emotion is the
-locomotion handoff; this script only updates assets, docs, and the shipped
-NaiWaChatPet.exe allow-list plus analyzer prompt.
+Do not use this script to rebuild emotion art. New performances are rendered
+by tools/render_emotions.py. Slicing legacy plates into new emotion ids is
+rejected. The exe allow-list patch below assumes the ORIGINAL unpatched
+binary layout and must not be re-run on an already patched exe.
 """
 
 import hashlib
 import json
-import shutil
 import struct
 from pathlib import Path
 
@@ -52,90 +51,11 @@ def sha256_file(path: Path) -> str:
     return h.hexdigest()
 
 
-def mouth_at(keyframes, frame):
-    keys = sorted(keyframes, key=lambda k: k["frame"])
-    if frame <= keys[0]["frame"]:
-        return keys[0]["x"], keys[0]["y"]
-    if frame >= keys[-1]["frame"]:
-        return keys[-1]["x"], keys[-1]["y"]
-    for a, b in zip(keys, keys[1:]):
-        if a["frame"] <= frame <= b["frame"]:
-            span = b["frame"] - a["frame"]
-            t = 0 if span == 0 else (frame - a["frame"]) / span
-            return a["x"] + (b["x"] - a["x"]) * t, a["y"] + (b["y"] - a["y"]) * t
-    return keys[-1]["x"], keys[-1]["y"]
-
-
-def pick_indices(emotion, nframes):
-    start = int(emotion["start"])
-    step = max(1, int(emotion["step"]))
-    count = int(emotion["count"])
-    last = start + step * (count - 1)
-    if start < 0 or last >= nframes:
-        raise SystemExit(
-            f"{emotion['id']} window start={start} step={step} count={count} exceeds {nframes} {emotion['source']} frames"
-        )
-    idxs = [start + step * i for i in range(count)]
-    if emotion.get("reverse"):
-        idxs.reverse()
-    return idxs
-
-
 def write_variant(emotion):
-    src_name = emotion["source"]
-    src_dir = ANIM / src_name
-    src_manifest = json.loads((src_dir / "manifest.json").read_text(encoding="utf-8"))
-    nframes = len(src_manifest["frames"])
-    idxs = pick_indices(emotion, nframes)
-    dest = ANIM / emotion["id"]
-    if dest.exists():
-        shutil.rmtree(dest)
-    dest.mkdir(parents=True)
-    frame_entries = []
-    raw_concat = bytearray()
-    out_keyframes = []
-    sample_at = {0, len(idxs) // 3, (2 * len(idxs)) // 3, len(idxs) - 1}
-    for out_i, src_i in enumerate(idxs):
-        src_file = src_manifest["frames"][src_i]["file"]
-        name = f"{out_i:04d}.png"
-        data = (src_dir / src_file).read_bytes()
-        (dest / name).write_bytes(data)
-        raw_concat += data
-        digest = hashlib.sha256(data).hexdigest()
-        frame_entries.append({"file": name, "sha256": digest})
-        if out_i in sample_at:
-            x, y = mouth_at(src_manifest["mouthKeyframes"], src_i)
-            out_keyframes.append({"frame": out_i, "x": round(x, 2), "y": round(y, 2)})
-    out_keyframes.sort(key=lambda k: k["frame"])
-    # Mouth frames must be strictly increasing.
-    dedup = []
-    for k in out_keyframes:
-        if dedup and dedup[-1]["frame"] == k["frame"]:
-            continue
-        dedup.append(k)
-    anchor = dedup[0]
-    manifest = {
-        "name": emotion["id"],
-        "emotion": emotion["id"],
-        "fps": int(emotion["fps"]),
-        "frameCount": len(frame_entries),
-        "loop": False,
-        "priority": 25,
-        "mouthAnchor": {"frame": anchor["frame"], "x": anchor["x"], "y": anchor["y"]},
-        "mouthKeyframes": dedup,
-        "transitionIn": emotion["transition_in"],
-        "transitionOut": emotion["transition_out"],
-        "canvas": {"width": 420, "height": 560},
-        "groundY": 540,
-        "frames": frame_entries,
-        "reviewed": True,
-        "sourceSha256": hashlib.sha256(raw_concat).hexdigest(),
-        "issues": [],
-    }
-    (dest / "manifest.json").write_text(
-        json.dumps(manifest, ensure_ascii=False, indent=2) + "\n", encoding="utf-8"
+    raise SystemExit(
+        "refusing to slice legacy frames into "
+        f"{emotion.get('id')}. Run tools/render_emotions.py instead."
     )
-    return sum(len((dest / fr["file"]).read_bytes()) for fr in frame_entries)
 
 
 def png_total():

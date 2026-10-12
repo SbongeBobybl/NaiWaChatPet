@@ -1,0 +1,58 @@
+{
+  "name": "love_out",
+  "emotion": "love_out",
+  "fps": 12,
+  "frameCount": 4,
+  "loop": false,
+  "priority": 25,
+  "mouthAnchor": {
+    "frame": 0,
+    "x": 214.0,
+    "y": 170.4
+  },
+  "mouthKeyframes": [
+    {
+      "frame": 0,
+      "x": 214.0,
+      "y": 170.4
+    },
+    {
+      "frame": 2,
+      "x": 214.0,
+      "y": 170.4
+    },
+    {
+      "frame": 3,
+      "x": 214.0,
+      "y": 170.4
+    }
+  ],
+  "transitionIn": "",
+  "transitionOut": "",
+  "canvas": {
+    "width": 420,
+    "height": 560
+  },
+  "groundY": 540,
+  "frames": [
+    {
+      "file": "0000.png",
+      "sha256": "8fd2d38e208d4bb16edd5a4497eb767abd8180d25dafa7d5bcf78271be97fe45"
+    },
+    {
+      "file": "0001.png",
+      "sha256": "363e72ae474350fb02e75e637e9fef96799897b7eab1b89c00aff7025cdd17b2"
+    },
+    {
+      "file": "0002.png",
+      "sha256": "7750fd7ff359c56569089b0ee58c971c4dc7155484bf56bbbdae81eaded48187"
+    },
+    {
+      "file": "0003.png",
+      "sha256": "5389ff5fc6f535a872df67540cf9dc8de592adac780c853cdc5f58ab07f46020"
+    }
+  ],
+  "reviewed": true,
+  "sourceSha256": "5f4b7a49c6a8b0ac122c45f609424bd454da2272a55dff09088d2e32ec9735ab",
+  "issues": []
+}
