@@ -8,38 +8,38 @@
   "mouthAnchor": {
     "frame": 0,
     "x": 153.5,
-    "y": 138.17
+    "y": 138.0
   },
   "mouthKeyframes": [
     {
       "frame": 0,
       "x": 153.5,
-      "y": 138.17
+      "y": 138.0
     },
     {
       "frame": 1,
-      "x": 153.5,
-      "y": 142.14
+      "x": 152.78,
+      "y": 137.94
     },
     {
       "frame": 2,
-      "x": 153.5,
-      "y": 146.12
+      "x": 152.89,
+      "y": 138.11
     },
     {
       "frame": 3,
-      "x": 153.5,
-      "y": 150.1
+      "x": 153.02,
+      "y": 138.24
     },
     {
       "frame": 4,
-      "x": 153.5,
-      "y": 150.1
+      "x": 153.02,
+      "y": 138.24
     },
     {
       "frame": 5,
-      "x": 153.5,
-      "y": 150.1
+      "x": 153.02,
+      "y": 138.24
     }
   ],
   "transitionIn": "happy_in",
@@ -56,26 +56,26 @@
     },
     {
       "file": "0001.png",
-      "sha256": "305a9e90724e403a3ee9b1f13c4419991418b18460dce92d464160f08e362f7f"
+      "sha256": "b67709b972e5bef6ebedba9300bf4a906fa8de2fa6aa365c94a44081038bda0c"
     },
     {
       "file": "0002.png",
-      "sha256": "fe13b9dda134aa69b6b0c0225b1f322ec33d760b0b5c562bda062e4505ef29ae"
+      "sha256": "487d5eb0a016ba393d6c238afa854a6dc5495d8bebc5fc28d5605b590a4e85c7"
     },
     {
       "file": "0003.png",
-      "sha256": "fddd21d80da94f0affaa53920f3fff8b61c0fcb7b86936277de53339c1cbfea8"
+      "sha256": "582016dc2591628b23734bece6de0a0bddbb829d111bb1dbcc0ab0f2e1cfe30f"
     },
     {
       "file": "0004.png",
-      "sha256": "fddd21d80da94f0affaa53920f3fff8b61c0fcb7b86936277de53339c1cbfea8"
+      "sha256": "582016dc2591628b23734bece6de0a0bddbb829d111bb1dbcc0ab0f2e1cfe30f"
     },
     {
       "file": "0005.png",
-      "sha256": "fddd21d80da94f0affaa53920f3fff8b61c0fcb7b86936277de53339c1cbfea8"
+      "sha256": "582016dc2591628b23734bece6de0a0bddbb829d111bb1dbcc0ab0f2e1cfe30f"
     }
   ],
   "reviewed": true,
-  "sourceSha256": "d54b9766894f7e0077c0a338753cac00905e53a221519311201bff246f2578c3",
+  "sourceSha256": "a9d9a8f49c07706135a752bbf8299a93ba8f1588e460110a34d3cbf8b7837615",
   "issues": []
 }

@@ -8,23 +8,23 @@
   "mouthAnchor": {
     "frame": 0,
     "x": 153.5,
-    "y": 138.17
+    "y": 138.0
   },
   "mouthKeyframes": [
     {
       "frame": 0,
       "x": 153.5,
-      "y": 138.17
+      "y": 138.0
     },
     {
       "frame": 1,
-      "x": 152.01,
-      "y": 117.0
+      "x": 149.52,
+      "y": 138.14
     },
     {
       "frame": 2,
       "x": 153.5,
-      "y": 138.17
+      "y": 138.0
     }
   ],
   "transitionIn": "",
@@ -41,7 +41,7 @@
     },
     {
       "file": "0001.png",
-      "sha256": "0c46c33e6bdc7e68244ad95a569ba99b08dd5bdc1d7be6067ebda801d4c5563a"
+      "sha256": "a68b35d856fac2f425fe1ecfe32655acdd39b37a34c722aec28de0258f49d3b6"
     },
     {
       "file": "0002.png",
@@ -49,6 +49,6 @@
     }
   ],
   "reviewed": true,
-  "sourceSha256": "b37202a3f42826b84bc7fe3765b5d7be9cd18cb50426a52bd56542ce62c791df",
+  "sourceSha256": "c34fcd64343281f3256c815e0ca7bf138f5162a0435135be698fd2f7d853512e",
   "issues": []
 }

@@ -8,38 +8,38 @@
   "mouthAnchor": {
     "frame": 0,
     "x": 153.5,
-    "y": 138.17
+    "y": 138.0
   },
   "mouthKeyframes": [
     {
       "frame": 0,
       "x": 153.5,
-      "y": 138.17
+      "y": 138.0
     },
     {
       "frame": 1,
-      "x": 146.71,
-      "y": 147.69
+      "x": 123.08,
+      "y": 137.75
     },
     {
       "frame": 2,
-      "x": 140.24,
-      "y": 157.25
+      "x": 123.01,
+      "y": 137.77
     },
     {
       "frame": 3,
-      "x": 134.09,
-      "y": 166.86
+      "x": 122.97,
+      "y": 137.76
     },
     {
       "frame": 4,
-      "x": 134.09,
-      "y": 166.86
+      "x": 122.97,
+      "y": 137.76
     },
     {
       "frame": 5,
-      "x": 134.09,
-      "y": 166.86
+      "x": 122.97,
+      "y": 137.76
     }
   ],
   "transitionIn": "relieved_in",
@@ -56,26 +56,26 @@
     },
     {
       "file": "0001.png",
-      "sha256": "ed777800aa6bd60816265ebe02fddf7801dddbf937c306bc9bc484583072059f"
+      "sha256": "15a7fb4b301a443c7c9321494b8c6e7ab4870c814abc88dccf8804c6e3c4caa0"
     },
     {
       "file": "0002.png",
-      "sha256": "362d656a735302e6c2eb05deb196b71818e8ca26f1973164ec4978b790192a1a"
+      "sha256": "34c21b1bd25ba2781a80d4580f9838bd35a9fc683443338a42756eb7e9afa6c2"
     },
     {
       "file": "0003.png",
-      "sha256": "49349937a20e57e2709b963675354a5c3b5fc500aa23181992791b209b98158a"
+      "sha256": "0f976929f0031f6c34b0c54ce5b1f8f5fecb3ead63bc7e2aec25bc2bf351e21b"
     },
     {
       "file": "0004.png",
-      "sha256": "49349937a20e57e2709b963675354a5c3b5fc500aa23181992791b209b98158a"
+      "sha256": "0f976929f0031f6c34b0c54ce5b1f8f5fecb3ead63bc7e2aec25bc2bf351e21b"
     },
     {
       "file": "0005.png",
-      "sha256": "49349937a20e57e2709b963675354a5c3b5fc500aa23181992791b209b98158a"
+      "sha256": "0f976929f0031f6c34b0c54ce5b1f8f5fecb3ead63bc7e2aec25bc2bf351e21b"
     }
   ],
   "reviewed": true,
-  "sourceSha256": "49bbaf47bc132036ad2ebb9564498b84058439d1aa979e4c6c5f1a30c8cf4d4d",
+  "sourceSha256": "886b3ab3875c97cc895e780a1c26320b3fca4dc3f2f40be397841b7f0d10ac24",
   "issues": []
 }

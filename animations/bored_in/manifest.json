@@ -2,29 +2,34 @@
   "name": "bored_in",
   "emotion": "bored_in",
   "fps": 12,
-  "frameCount": 3,
+  "frameCount": 4,
   "loop": false,
   "priority": 25,
   "mouthAnchor": {
     "frame": 0,
     "x": 153.5,
-    "y": 138.17
+    "y": 138.0
   },
   "mouthKeyframes": [
     {
       "frame": 0,
       "x": 153.5,
-      "y": 138.17
+      "y": 138.0
     },
     {
       "frame": 1,
-      "x": 152.7,
-      "y": 146.08
+      "x": 170.04,
+      "y": 137.75
     },
     {
       "frame": 2,
-      "x": 152.9,
-      "y": 153.99
+      "x": 170.08,
+      "y": 137.76
+    },
+    {
+      "frame": 3,
+      "x": 168.92,
+      "y": 138.0
     }
   ],
   "transitionIn": "",
@@ -41,14 +46,18 @@
     },
     {
       "file": "0001.png",
-      "sha256": "984110b5eb0ab01d539a4e27b154af53c71042f70ea871501b0e667fd3ea3620"
+      "sha256": "927873a52bf983cc9e05a64a0d291d9e19075a2e9b5e16d6d99fa94f413a8947"
     },
     {
       "file": "0002.png",
-      "sha256": "e8c46b43a7d905edc173554a6e6b620bffff14df86c9fac088e0392c3163af16"
+      "sha256": "5ecbc71800ac0c5fa327b6eae52264aaf41885d387801b647e9ddee10c780fcf"
+    },
+    {
+      "file": "0003.png",
+      "sha256": "06142929fcfdb71fc6df516374e0d2e2eb79279682780139ea656ba3d6c3fa15"
     }
   ],
   "reviewed": true,
-  "sourceSha256": "d4c4b799e1b04312a487d414f61497b280dc67d535abe74a50b622eb9a04552a",
+  "sourceSha256": "c937fffc34a3f63ab1f60d5e0f5e9d9a2b480b9578a9dae55758bf92cbb2add8",
   "issues": []
 }
