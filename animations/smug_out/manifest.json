@@ -18,8 +18,8 @@
     },
     {
       "frame": 1,
-      "x": 132.35,
-      "y": 138.48
+      "x": 133.53,
+      "y": 138.1
     },
     {
       "frame": 2,
@@ -41,7 +41,7 @@
     },
     {
       "file": "0001.png",
-      "sha256": "80221371de9c105be4e79c27be9afd294e1d87c8613cfb1cb659aa70602c80c4"
+      "sha256": "498cf8c1ca24d437e942611715f6dddbaa10e646135c7e17aa4098d75e3b43e8"
     },
     {
       "file": "0002.png",
@@ -49,6 +49,6 @@
     }
   ],
   "reviewed": true,
-  "sourceSha256": "592460a4340336844efd8c9f361f71a23b97bd1268a9075fba5782958703b086",
+  "sourceSha256": "6286f3b23f86c6e6bbd63f978784b6229f4b65900710e37511bdbff6d63d22ff",
   "issues": []
 }

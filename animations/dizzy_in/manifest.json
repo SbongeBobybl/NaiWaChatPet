@@ -18,17 +18,17 @@
     },
     {
       "frame": 1,
-      "x": 161.33,
-      "y": 137.47
+      "x": 144.28,
+      "y": 137.29
     },
     {
       "frame": 2,
-      "x": 161.33,
-      "y": 137.47
+      "x": 144.28,
+      "y": 137.29
     },
     {
       "frame": 3,
-      "x": 161.33,
+      "x": 143.33,
       "y": 137.47
     }
   ],
@@ -46,18 +46,18 @@
     },
     {
       "file": "0001.png",
-      "sha256": "ac7b7c5f3b710a49171949c181237f820ee29841206fc58ef2a3bc0de63fde9b"
+      "sha256": "7062395752063f0b7327bc36b3d930666cef9b4df63462de73adfa5b85c9f9dd"
     },
     {
       "file": "0002.png",
-      "sha256": "ac7b7c5f3b710a49171949c181237f820ee29841206fc58ef2a3bc0de63fde9b"
+      "sha256": "7062395752063f0b7327bc36b3d930666cef9b4df63462de73adfa5b85c9f9dd"
     },
     {
       "file": "0003.png",
-      "sha256": "ac7b7c5f3b710a49171949c181237f820ee29841206fc58ef2a3bc0de63fde9b"
+      "sha256": "cb80f937d9ee786ef1e126cc2d8d1a1af96a7a36423269baa709b8850f1c88be"
     }
   ],
   "reviewed": true,
-  "sourceSha256": "8b3fea074c5f69b91e076a13479c35eb77f81ec7cf3c038ae3ca5b595a4389a2",
+  "sourceSha256": "dc3f8f0d5b01bef95c0a55c7e7ac4a19428a5db7166d59f8c62a6849006a7b50",
   "issues": []
 }

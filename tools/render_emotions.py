@@ -7,9 +7,10 @@ conditioned on that photo so the character stays the side-view NaiWa
 squash of the photo and not a repainted face.
 
 Frame 0 of every new clip is the byte-identical canonical plate
-source/emotion/neutral-reference.png. Later frames are an optical-flow morph
-from one clean key to the next when that morph stays a single opaque body.
-When the morph would ghost, the clip cuts to the clean key instead.
+source/emotion/neutral-reference.png. Limb changes cut through drawn
+in-between poses (optical flow ghosts an extra arm). Small face changes
+morph, sampled across the part of the blend where the eye actually moves.
+Frame 4 of each main clip stays the accepted peak.
 """
 
 from __future__ import annotations
@@ -39,21 +40,19 @@ FPS = 12
 N_IN, N_MAIN, N_OUT = 4, 6, 3
 SAFE_BUDGET = 125 * 1024 * 1024
 CLEAN_PARTIAL = 0.10
-# Limb and open-mouth changes ghost under a full-body morph, so those
-# clips cut from the reference plate to the clean key instead.
-FORCE_CUT = {
-    "proud",
-    "smug",
-    "cheer",
-    "greet",
-    "scared",
-    "grateful",
-    "celebrate",
-    "hug",
-    "ponder",
-    "annoyed",
-    "refuse",
-    "sleepy",
+# Face-only changes whose photo-to-peak morph stays one body and one eye.
+# Everything else cuts between drawn poses. A 3D-to-3D morph of a limb
+# still ghosts, so those spans are never flowed.
+MORPH_FACE = {
+    "happy",
+    "love",
+    "excited",
+    "bored",
+    "relieved",
+    "worried",
+    "crying",
+    "wronged",
+    "shocked",
 }
 
 # (peak file, optional mid file, one-line performance)
@@ -105,6 +104,28 @@ STANCE_DX = {
     "shocked": 24,
     "relieved": -30,
     "focused": 30,
+}
+
+# Drawn partial poses, in time order, between the plate (t=0) and the peak (t=1).
+TWEENS = {
+    "proud": [(0.50, "proud-early.jpg")],
+    "sleepy": [(0.45, "sleepy-early.jpg")],
+    "scared": [(0.45, "scared-early.jpg")],
+    "embarrassed": [(0.50, "embarrassed-early.jpg")],
+    "curious": [(0.50, "curious-early.jpg")],
+    "disappointed": [(0.50, "disappointed-early.jpg")],
+    "grateful": [(0.50, "grateful-early.jpg")],
+    "smug": [(0.50, "smug-early.jpg")],
+    "cheer": [(0.34, "cheer-early.jpg"), (0.67, "cheer-mid.jpg")],
+    "dizzy": [(0.45, "dizzy-early.jpg")],
+    "focused": [(0.50, "focused-early.jpg")],
+    "greet": [(0.55, "greet-early.jpg")],
+    "agree": [(0.50, "agree-early.jpg")],
+    "refuse": [(0.36, "refuse-early.jpg"), (0.72, "refuse-late.jpg")],
+    "ponder": [(0.50, "ponder-early.jpg")],
+    "annoyed": [(0.50, "annoyed-early.jpg")],
+    "celebrate": [(0.50, "celebrate-early.jpg")],
+    "hug": [(0.50, "hug-early.jpg")],
 }
 
 
@@ -266,15 +287,24 @@ def load_plate(path: Path, cm: dict) -> np.ndarray:
     return finish(align_to_canon(key_rgba(Image.open(path)), cm))
 
 
-def build_bridges(canon: np.ndarray, emotion_id: str, cm: dict):
-    peak_name, mid_name, _desc = POSES[emotion_id]
+def pose_keys(canon: np.ndarray, emotion_id: str, cm: dict):
+    peak_name, _mid_name, _desc = POSES[emotion_id]
     keys = [(0.0, canon)]
-    if mid_name:
-        keys.append((0.5, load_plate(KEYS / mid_name, cm)))
+    for t, name in TWEENS.get(emotion_id, []):
+        keys.append((float(t), load_plate(KEYS / name, cm)))
     keys.append((1.0, load_plate(KEYS / peak_name, cm)))
+    keys.sort(key=lambda item: item[0])
+    return keys
+
+
+def build_bridges(canon: np.ndarray, emotion_id: str, cm: dict):
+    keys = pose_keys(canon, emotion_id, cm)
+    # Only the photo-to-face span is allowed to morph, and only when there
+    # is no drawn in-between. Limb spans cut to the drawn plate.
+    allow = emotion_id in MORPH_FACE and len(keys) == 2
     bridges = []
     for (t0, a), (t1, b) in zip(keys, keys[1:]):
-        bridges.append(Bridge(a, b, t0, t1, emotion_id not in FORCE_CUT))
+        bridges.append(Bridge(a, b, t0, t1, allow))
     return bridges
 
 
@@ -287,16 +317,45 @@ def sample_t(bridges, t: float) -> np.ndarray:
             local = (t - bridge.t0) / span
             if bridge.clean:
                 return bridge.at(local)
-            return bridge.b if local >= 0.2 else bridge.a
+            # Nearest drawn key. Sampling a key's own time lands on that key.
+            return bridge.b if local >= 0.5 else bridge.a
     return bridges[-1].b
 
 
-def phase_times(phase: str):
+def phase_times(phase: str, bridges):
+    """Main index 4 is always the peak (t=1) so the distinctness check holds."""
+    mids = [bridge.t1 for bridge in bridges[:-1]]
+    keyed = not bridges[0].clean
+    if keyed:
+        if phase == "in":
+            if len(mids) >= 2:
+                return [0.0, mids[0], mids[1], 1.0]
+            if len(mids) == 1:
+                return [0.0, mids[0], mids[0], 1.0]
+            return [0.0, 1.0, 1.0, 1.0]
+        if phase == "main":
+            if len(mids) >= 2:
+                return [0.0, mids[0], mids[1], 1.0, 1.0, 1.0]
+            if len(mids) == 1:
+                return [0.0, mids[0], mids[0], 1.0, 1.0, 1.0]
+            return [0.0, 1.0, 1.0, 1.0, 1.0, 1.0]
+        first = mids[0] if mids else 0.0
+        return [0.0, first, 0.0]
+    # The squint happens between about 0.18 and 0.45; 0004 stays the peak.
     if phase == "in":
-        return [0.0, 0.33, 0.66, 1.0]
+        return [0.0, 0.20, 0.36, 1.0]
     if phase == "main":
-        return [0.0, 0.4, 0.7, 1.0, 1.0, 1.0]
-    return [0.0, 0.5, 0.0]
+        return [0.0, 0.16, 0.28, 0.42, 1.0, 1.0]
+    return [0.0, 0.18, 0.0]
+
+
+def stance_for(emotion_id: str, t: float) -> int:
+    full = STANCE_DX.get(emotion_id, 0)
+    if full == 0 or t >= 1.0:
+        return full
+    u = min(1.0, t / 0.55)
+    u = u * u * (3.0 - 2.0 * u)
+    return int(round(full * u))
 
 
 def head_anchor(img: np.ndarray):
@@ -357,7 +416,7 @@ def render_clip(bridges, canon_bytes, canon, emotion_id, phase, dest_root: Path)
     dest.mkdir(parents=True)
     hx, hy = head_anchor(canon)
     mouths = []
-    times = phase_times(phase)
+    times = phase_times(phase, bridges)
     for i, t in enumerate(times):
         path = dest / f"{i:04d}.png"
         if t <= 0:
@@ -365,7 +424,7 @@ def render_clip(bridges, canon_bytes, canon, emotion_id, phase, dest_root: Path)
             mouths.append((i, 153.5, 138.0))
             continue
         arr = sample_t(bridges, t)
-        dx = STANCE_DX.get(emotion_id, 0)
+        dx = stance_for(emotion_id, t)
         if emotion_id == "dizzy" and phase == "main":
             dx += DIZZY_DX.get(i, 0)
         if dx:
@@ -473,9 +532,26 @@ def write_gifs(dest_root: Path, ids):
                 frames.append(on_white(Image.open(path)))
         if not frames:
             continue
+        # Identical holds would be dropped by the GIF encoder. Keep their time
+        # on the previous picture so the preview matches the PNG playback.
+        unique = [frames[0]]
+        durations = [int(1000 / FPS)]
+        for frame in frames[1:]:
+            if frame.tobytes() == unique[-1].tobytes():
+                durations[-1] += int(1000 / FPS)
+            else:
+                unique.append(frame)
+                durations.append(int(1000 / FPS))
         gif = out / f"{emotion_id}.gif"
-        frames[0].save(gif, save_all=True, append_images=frames[1:], duration=int(1000 / FPS), loop=0, disposal=2)
-        print("wrote", gif)
+        unique[0].save(
+            gif,
+            save_all=True,
+            append_images=unique[1:],
+            duration=durations,
+            loop=0,
+            disposal=2,
+        )
+        print("wrote", gif, "frames", len(unique))
 
 
 def sync_catalog():
@@ -497,8 +573,10 @@ def sync_catalog():
         emotion["production"] = (
             "Keyframe edit of source/emotion/reference-neutral.jpg via tools/render_emotions.py "
             "(image-to-image, same side-view character). Frame 0 of this clip and of its in/out clips "
-            "is source/emotion/neutral-reference.png byte for byte. Later frames are an optical-flow "
-            "morph into the key pose when the body stays single, otherwise a cut to that clean pose. "
+            "is source/emotion/neutral-reference.png byte for byte. In-betweens are drawn partial poses "
+            "when the body moves, so the action eases onto the peak instead of popping. Small face "
+            "changes are an optical-flow morph sampled across the blink. A morph is not used when it "
+            "would ghost a limb or a second eye. "
             + desc
         )
         if emotion["id"] == "happy":
@@ -522,6 +600,18 @@ def sync_catalog():
         "`tools/render_emotions.py`. Peak poses are image-to-image edits of "
         "`source/emotion/reference-neutral.jpg`, locked to the same side-view frog. "
         "Frame 0 of each new clip (`animations/<id>`, `<id>_in`, `<id>_out`) is "
+        "`source/emotion/neutral-reference.png` byte for byte. In-betweens are drawn partial poses "
+        "when an arm, a crouch, or a bow moves, played in order so the action eases onto the peak. "
+        "Small face changes are an optical-flow morph sampled across the blink. A morph is not used "
+        "when it would ghost a limb or a second eye. They are not crops of the legacy plates, not an "
+        "affine squash with painted eyes, and not a different shaded character. Standing poses that "
+        "share a silhouette take a small sideways weight shift so each one reads apart from the others."
+    )
+    previous = (
+        "Every other emotion is a keyframe performance of the reference character, built by "
+        "`tools/render_emotions.py`. Peak poses are image-to-image edits of "
+        "`source/emotion/reference-neutral.jpg`, locked to the same side-view frog. "
+        "Frame 0 of each new clip (`animations/<id>`, `<id>_in`, `<id>_out`) is "
         "`source/emotion/neutral-reference.png` byte for byte. Later frames are an optical-flow "
         "morph from that plate into the key pose when the silhouette stays a single body, and a cut "
         "to the clean key when a morph would ghost. They are not crops of the legacy plates, not an "
@@ -530,6 +620,8 @@ def sync_catalog():
     )
     if old in text:
         text = text.replace(old, new, 1)
+    elif previous in text:
+        text = text.replace(previous, new, 1)
     elif new not in text:
         raise SystemExit("contract performance paragraph was not found")
     CONTRACT_PATH.write_text(text, encoding="utf-8")

@@ -18,13 +18,13 @@
     },
     {
       "frame": 1,
-      "x": 152.68,
-      "y": 138.47
+      "x": 154.78,
+      "y": 138.64
     },
     {
       "frame": 2,
-      "x": 152.68,
-      "y": 138.47
+      "x": 154.78,
+      "y": 138.64
     },
     {
       "frame": 3,
@@ -46,18 +46,18 @@
     },
     {
       "file": "0001.png",
-      "sha256": "70c318eca61ff1b0ef1c6811df40a1d370e3da855eae1209773af06c6aabc031"
+      "sha256": "ec9bf784d3b31e161d1f1721aedfdafd686099fcd4261f2e5424fb2641559550"
     },
     {
       "file": "0002.png",
-      "sha256": "70c318eca61ff1b0ef1c6811df40a1d370e3da855eae1209773af06c6aabc031"
+      "sha256": "ec9bf784d3b31e161d1f1721aedfdafd686099fcd4261f2e5424fb2641559550"
     },
     {
       "file": "0003.png",
-      "sha256": "70c318eca61ff1b0ef1c6811df40a1d370e3da855eae1209773af06c6aabc031"
+      "sha256": "1fd8067f65e5468d0ac804bc3ade0afa3a8b5e386811999c19efcc2d7d6423ec"
     }
   ],
   "reviewed": true,
-  "sourceSha256": "fda997288c84a77b4d8c6351b5228f515185cf3140caef38b33b74dd7c9a55e8",
+  "sourceSha256": "f1e971106025320cdce75b02abd1197d66bedfc33a19c775414061655c3206f9",
   "issues": []
 }
