@@ -1,0 +1,81 @@
+{
+  "name": "wronged",
+  "emotion": "wronged",
+  "fps": 12,
+  "frameCount": 6,
+  "loop": false,
+  "priority": 25,
+  "mouthAnchor": {
+    "frame": 0,
+    "x": 153.5,
+    "y": 138.0
+  },
+  "mouthKeyframes": [
+    {
+      "frame": 0,
+      "x": 153.5,
+      "y": 138.0
+    },
+    {
+      "frame": 1,
+      "x": 150.89,
+      "y": 137.61
+    },
+    {
+      "frame": 2,
+      "x": 145.74,
+      "y": 137.93
+    },
+    {
+      "frame": 3,
+      "x": 141.65,
+      "y": 137.92
+    },
+    {
+      "frame": 4,
+      "x": 139.5,
+      "y": 138.17
+    },
+    {
+      "frame": 5,
+      "x": 139.5,
+      "y": 138.17
+    }
+  ],
+  "transitionIn": "wronged_in",
+  "transitionOut": "wronged_out",
+  "canvas": {
+    "width": 420,
+    "height": 560
+  },
+  "groundY": 540,
+  "frames": [
+    {
+      "file": "0000.png",
+      "sha256": "cc055177b4847597a08443d299de01ef9973aa4758d012f8433733324bd0e3e2"
+    },
+    {
+      "file": "0001.png",
+      "sha256": "669df7ed666024e3b5fafd48b8837c93d32bfa7e982173b1eee0583648cd2049"
+    },
+    {
+      "file": "0002.png",
+      "sha256": "3f42609b7cc0691d7ecebddc0f4bfaff234a2a97ee175aae0282e44802cdcdd7"
+    },
+    {
+      "file": "0003.png",
+      "sha256": "289d2169ed700702431cac5018ebbbca6d6507a39d99777e806a2b4ed862856c"
+    },
+    {
+      "file": "0004.png",
+      "sha256": "a0e352e9748eca0d2510c1842a29ec7c60d89e94ea641f5dd75c8d02fc1688cc"
+    },
+    {
+      "file": "0005.png",
+      "sha256": "a0e352e9748eca0d2510c1842a29ec7c60d89e94ea641f5dd75c8d02fc1688cc"
+    }
+  ],
+  "reviewed": true,
+  "sourceSha256": "1d7e4c90ee4499a3567f2d11b9bc63b38315bb3c7fb39202495ca5da8e405189",
+  "issues": []
+}

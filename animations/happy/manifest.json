@@ -1,0 +1,81 @@
+{
+  "name": "happy",
+  "emotion": "happy",
+  "fps": 12,
+  "frameCount": 6,
+  "loop": false,
+  "priority": 25,
+  "mouthAnchor": {
+    "frame": 0,
+    "x": 153.5,
+    "y": 138.0
+  },
+  "mouthKeyframes": [
+    {
+      "frame": 0,
+      "x": 153.5,
+      "y": 138.0
+    },
+    {
+      "frame": 1,
+      "x": 153.24,
+      "y": 137.81
+    },
+    {
+      "frame": 2,
+      "x": 152.81,
+      "y": 137.94
+    },
+    {
+      "frame": 3,
+      "x": 152.78,
+      "y": 137.95
+    },
+    {
+      "frame": 4,
+      "x": 153.02,
+      "y": 138.24
+    },
+    {
+      "frame": 5,
+      "x": 153.02,
+      "y": 138.24
+    }
+  ],
+  "transitionIn": "happy_in",
+  "transitionOut": "happy_out",
+  "canvas": {
+    "width": 420,
+    "height": 560
+  },
+  "groundY": 540,
+  "frames": [
+    {
+      "file": "0000.png",
+      "sha256": "cc055177b4847597a08443d299de01ef9973aa4758d012f8433733324bd0e3e2"
+    },
+    {
+      "file": "0001.png",
+      "sha256": "913bfdf15a66fc27912c5d7a0b0aa533b610162db3436ac2c9dbe86059b61c69"
+    },
+    {
+      "file": "0002.png",
+      "sha256": "7d42ca9c1751c5f4ab299cf1f31c66005ba049697b0b1c7d5dbd30de8e0a2a07"
+    },
+    {
+      "file": "0003.png",
+      "sha256": "428a26c022557166d650855fb0ae94f24a08682a6d2184b102fa913c5c07571c"
+    },
+    {
+      "file": "0004.png",
+      "sha256": "53fb09802cddd52109201aa0cde52a277a4c84d88b024287457a9625ecfd9489"
+    },
+    {
+      "file": "0005.png",
+      "sha256": "53fb09802cddd52109201aa0cde52a277a4c84d88b024287457a9625ecfd9489"
+    }
+  ],
+  "reviewed": true,
+  "sourceSha256": "bf4bb18101e3a6519cfff3e64e2b1fdbb48b2a4d8dfada762a8538df9b1df270",
+  "issues": []
+}

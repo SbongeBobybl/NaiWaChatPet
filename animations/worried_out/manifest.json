@@ -1,0 +1,54 @@
+{
+  "name": "worried_out",
+  "emotion": "worried_out",
+  "fps": 12,
+  "frameCount": 3,
+  "loop": false,
+  "priority": 25,
+  "mouthAnchor": {
+    "frame": 0,
+    "x": 153.5,
+    "y": 138.0
+  },
+  "mouthKeyframes": [
+    {
+      "frame": 0,
+      "x": 153.5,
+      "y": 138.0
+    },
+    {
+      "frame": 1,
+      "x": 146.84,
+      "y": 137.78
+    },
+    {
+      "frame": 2,
+      "x": 153.5,
+      "y": 138.0
+    }
+  ],
+  "transitionIn": "",
+  "transitionOut": "",
+  "canvas": {
+    "width": 420,
+    "height": 560
+  },
+  "groundY": 540,
+  "frames": [
+    {
+      "file": "0000.png",
+      "sha256": "cc055177b4847597a08443d299de01ef9973aa4758d012f8433733324bd0e3e2"
+    },
+    {
+      "file": "0001.png",
+      "sha256": "e7caac87731dee6cac47a205cd6d56a41b3d90f955570fea180ca5ee6c2033fc"
+    },
+    {
+      "file": "0002.png",
+      "sha256": "cc055177b4847597a08443d299de01ef9973aa4758d012f8433733324bd0e3e2"
+    }
+  ],
+  "reviewed": true,
+  "sourceSha256": "e629f0fc0a35991eed384b02fb29db114b4cfabf78a49354aa2146f53aa15ed9",
+  "issues": []
+}

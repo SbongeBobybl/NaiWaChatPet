@@ -1,0 +1,54 @@
+{
+  "name": "annoyed_out",
+  "emotion": "annoyed_out",
+  "fps": 12,
+  "frameCount": 3,
+  "loop": false,
+  "priority": 25,
+  "mouthAnchor": {
+    "frame": 0,
+    "x": 153.5,
+    "y": 138.0
+  },
+  "mouthKeyframes": [
+    {
+      "frame": 0,
+      "x": 153.5,
+      "y": 138.0
+    },
+    {
+      "frame": 1,
+      "x": 154.78,
+      "y": 138.64
+    },
+    {
+      "frame": 2,
+      "x": 153.5,
+      "y": 138.0
+    }
+  ],
+  "transitionIn": "",
+  "transitionOut": "",
+  "canvas": {
+    "width": 420,
+    "height": 560
+  },
+  "groundY": 540,
+  "frames": [
+    {
+      "file": "0000.png",
+      "sha256": "cc055177b4847597a08443d299de01ef9973aa4758d012f8433733324bd0e3e2"
+    },
+    {
+      "file": "0001.png",
+      "sha256": "ec9bf784d3b31e161d1f1721aedfdafd686099fcd4261f2e5424fb2641559550"
+    },
+    {
+      "file": "0002.png",
+      "sha256": "cc055177b4847597a08443d299de01ef9973aa4758d012f8433733324bd0e3e2"
+    }
+  ],
+  "reviewed": true,
+  "sourceSha256": "6047ae75bb26248c490ea0e98eafd85d724fd1df88704fa0ccb76ce8f008e839",
+  "issues": []
+}

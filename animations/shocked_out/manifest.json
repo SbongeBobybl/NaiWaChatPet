@@ -1,0 +1,54 @@
+{
+  "name": "shocked_out",
+  "emotion": "shocked_out",
+  "fps": 12,
+  "frameCount": 3,
+  "loop": false,
+  "priority": 25,
+  "mouthAnchor": {
+    "frame": 0,
+    "x": 153.5,
+    "y": 138.0
+  },
+  "mouthKeyframes": [
+    {
+      "frame": 0,
+      "x": 153.5,
+      "y": 138.0
+    },
+    {
+      "frame": 1,
+      "x": 158.67,
+      "y": 138.05
+    },
+    {
+      "frame": 2,
+      "x": 153.5,
+      "y": 138.0
+    }
+  ],
+  "transitionIn": "",
+  "transitionOut": "",
+  "canvas": {
+    "width": 420,
+    "height": 560
+  },
+  "groundY": 540,
+  "frames": [
+    {
+      "file": "0000.png",
+      "sha256": "cc055177b4847597a08443d299de01ef9973aa4758d012f8433733324bd0e3e2"
+    },
+    {
+      "file": "0001.png",
+      "sha256": "693396ad354f62f9b28d5b46cdcc2826d763583b16d3671072a57071ca4797dd"
+    },
+    {
+      "file": "0002.png",
+      "sha256": "cc055177b4847597a08443d299de01ef9973aa4758d012f8433733324bd0e3e2"
+    }
+  ],
+  "reviewed": true,
+  "sourceSha256": "dd277d3fbc6ae1ba417dee7826123193d748561d13c81b7c70c4580293ce6183",
+  "issues": []
+}

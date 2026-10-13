@@ -1,0 +1,81 @@
+{
+  "name": "crying",
+  "emotion": "crying",
+  "fps": 12,
+  "frameCount": 6,
+  "loop": false,
+  "priority": 25,
+  "mouthAnchor": {
+    "frame": 0,
+    "x": 153.5,
+    "y": 138.0
+  },
+  "mouthKeyframes": [
+    {
+      "frame": 0,
+      "x": 153.5,
+      "y": 138.0
+    },
+    {
+      "frame": 1,
+      "x": 154.67,
+      "y": 137.5
+    },
+    {
+      "frame": 2,
+      "x": 156.47,
+      "y": 137.86
+    },
+    {
+      "frame": 3,
+      "x": 160.52,
+      "y": 137.8
+    },
+    {
+      "frame": 4,
+      "x": 162.09,
+      "y": 137.33
+    },
+    {
+      "frame": 5,
+      "x": 162.09,
+      "y": 137.33
+    }
+  ],
+  "transitionIn": "crying_in",
+  "transitionOut": "crying_out",
+  "canvas": {
+    "width": 420,
+    "height": 560
+  },
+  "groundY": 540,
+  "frames": [
+    {
+      "file": "0000.png",
+      "sha256": "cc055177b4847597a08443d299de01ef9973aa4758d012f8433733324bd0e3e2"
+    },
+    {
+      "file": "0001.png",
+      "sha256": "30173ed6e77707bfb6c00748e27166c667a48befe357c5155fb5c580ca5fa77b"
+    },
+    {
+      "file": "0002.png",
+      "sha256": "7bddea9b42929e46a05202211d58aeffa8734c42971abf74fa0f9804495ff69c"
+    },
+    {
+      "file": "0003.png",
+      "sha256": "70c601235c413734a35505e62a23389e256b4798b015a82935c7440790250fd6"
+    },
+    {
+      "file": "0004.png",
+      "sha256": "04ac406b2561f2110555f26388813448e5c42bbd0f07b85bc0a1fcecd49d2f52"
+    },
+    {
+      "file": "0005.png",
+      "sha256": "04ac406b2561f2110555f26388813448e5c42bbd0f07b85bc0a1fcecd49d2f52"
+    }
+  ],
+  "reviewed": true,
+  "sourceSha256": "0253fcaa11f39588c443d63b4594e73065559224a294a23c4ea55998d7a3756b",
+  "issues": []
+}

@@ -1,0 +1,54 @@
+{
+  "name": "relieved_out",
+  "emotion": "relieved_out",
+  "fps": 12,
+  "frameCount": 3,
+  "loop": false,
+  "priority": 25,
+  "mouthAnchor": {
+    "frame": 0,
+    "x": 153.5,
+    "y": 138.0
+  },
+  "mouthKeyframes": [
+    {
+      "frame": 0,
+      "x": 153.5,
+      "y": 138.0
+    },
+    {
+      "frame": 1,
+      "x": 145.17,
+      "y": 137.72
+    },
+    {
+      "frame": 2,
+      "x": 153.5,
+      "y": 138.0
+    }
+  ],
+  "transitionIn": "",
+  "transitionOut": "",
+  "canvas": {
+    "width": 420,
+    "height": 560
+  },
+  "groundY": 540,
+  "frames": [
+    {
+      "file": "0000.png",
+      "sha256": "cc055177b4847597a08443d299de01ef9973aa4758d012f8433733324bd0e3e2"
+    },
+    {
+      "file": "0001.png",
+      "sha256": "16588fc66586e597861ebf4e49e6608e4ba1d80a1cb77c95ba9575cb958a569c"
+    },
+    {
+      "file": "0002.png",
+      "sha256": "cc055177b4847597a08443d299de01ef9973aa4758d012f8433733324bd0e3e2"
+    }
+  ],
+  "reviewed": true,
+  "sourceSha256": "49338e35a64e857b5234e558f01b0f9dd569c55ca2ceed80dc79a2318eab185c",
+  "issues": []
+}

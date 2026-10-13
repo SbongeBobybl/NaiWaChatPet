@@ -1,0 +1,347 @@
+{
+  "emotions": [
+    {
+      "id": "happy",
+      "zh": "开心",
+      "priority": "normal",
+      "legacy": false,
+      "clip": "animations/happy",
+      "transition_in": "happy_in",
+      "transition_out": "happy_out",
+      "fps": 12,
+      "note": "Low intensity returns to idle. Intensity >= 0.6 still plays the embedded full laugh (toLaugh/video/fromLaugh). This plate opens on the reference artwork, then plays the keyframe smile.",
+      "production": "Keyframe edit of source/emotion/reference-neutral.jpg via tools/render_emotions.py (image-to-image, same side-view character). Frame 0 of this clip and of its in/out clips is source/emotion/neutral-reference.png byte for byte. In-betweens are drawn partial poses when the body moves, so the action eases onto the peak instead of popping. Small face changes are an optical-flow morph sampled across the blink. A morph is not used when it would ghost a limb or a second eye. Squinting smile and blush, both hands on the belly."
+    },
+    {
+      "id": "surprised",
+      "zh": "惊讶",
+      "priority": "high",
+      "legacy": true,
+      "clip": "animations/surprised",
+      "transition_in": "surprised_in",
+      "transition_out": "surprised_out"
+    },
+    {
+      "id": "confused",
+      "zh": "疑惑",
+      "priority": "normal",
+      "legacy": true,
+      "clip": "animations/confused",
+      "transition_in": "confused_in",
+      "transition_out": "confused_out"
+    },
+    {
+      "id": "shy",
+      "zh": "害羞",
+      "priority": "normal",
+      "legacy": true,
+      "clip": "animations/shy",
+      "transition_in": "shy_in",
+      "transition_out": "shy_out"
+    },
+    {
+      "id": "sad",
+      "zh": "伤心",
+      "priority": "normal",
+      "legacy": true,
+      "clip": "animations/sad",
+      "transition_in": "sad_in",
+      "transition_out": "sad_out"
+    },
+    {
+      "id": "angry",
+      "zh": "生气",
+      "priority": "high",
+      "legacy": true,
+      "clip": "animations/angry",
+      "transition_in": "angry_in",
+      "transition_out": "angry_out"
+    },
+    {
+      "id": "proud",
+      "zh": "得意",
+      "priority": "normal",
+      "legacy": false,
+      "clip": "animations/proud",
+      "transition_in": "proud_in",
+      "transition_out": "proud_out",
+      "fps": 12,
+      "production": "Keyframe edit of source/emotion/reference-neutral.jpg via tools/render_emotions.py (image-to-image, same side-view character). Frame 0 of this clip and of its in/out clips is source/emotion/neutral-reference.png byte for byte. In-betweens are drawn partial poses when the body moves, so the action eases onto the peak instead of popping. Small face changes are an optical-flow morph sampled across the blink. A morph is not used when it would ghost a limb or a second eye. Chin up, lidded smirk, hands set on the hips."
+    },
+    {
+      "id": "sleepy",
+      "zh": "困倦",
+      "priority": "low",
+      "legacy": false,
+      "clip": "animations/sleepy",
+      "transition_in": "sleepy_in",
+      "transition_out": "sleepy_out",
+      "fps": 12,
+      "production": "Keyframe edit of source/emotion/reference-neutral.jpg via tools/render_emotions.py (image-to-image, same side-view character). Frame 0 of this clip and of its in/out clips is source/emotion/neutral-reference.png byte for byte. In-betweens are drawn partial poses when the body moves, so the action eases onto the peak instead of popping. Small face changes are an optical-flow morph sampled across the blink. A morph is not used when it would ghost a limb or a second eye. Slouch, the one eye closed, mouth open in a small yawn."
+    },
+    {
+      "id": "love",
+      "zh": "喜爱",
+      "priority": "normal",
+      "legacy": false,
+      "clip": "animations/love",
+      "transition_in": "love_in",
+      "transition_out": "love_out",
+      "fps": 12,
+      "production": "Keyframe edit of source/emotion/reference-neutral.jpg via tools/render_emotions.py (image-to-image, same side-view character). Frame 0 of this clip and of its in/out clips is source/emotion/neutral-reference.png byte for byte. In-betweens are drawn partial poses when the body moves, so the action eases onto the peak instead of popping. Small face changes are an optical-flow morph sampled across the blink. A morph is not used when it would ghost a limb or a second eye. Closed-eye smile, blush, hands pressing the belly."
+    },
+    {
+      "id": "scared",
+      "zh": "害怕",
+      "priority": "high",
+      "legacy": false,
+      "clip": "animations/scared",
+      "transition_in": "scared_in",
+      "transition_out": "scared_out",
+      "fps": 12,
+      "production": "Keyframe edit of source/emotion/reference-neutral.jpg via tools/render_emotions.py (image-to-image, same side-view character). Frame 0 of this clip and of its in/out clips is source/emotion/neutral-reference.png byte for byte. In-betweens are drawn partial poses when the body moves, so the action eases onto the peak instead of popping. Small face changes are an optical-flow morph sampled across the blink. A morph is not used when it would ghost a limb or a second eye. Knees bent in a crouch, small gasp, hands on the belly."
+    },
+    {
+      "id": "excited",
+      "zh": "兴奋",
+      "priority": "high",
+      "legacy": false,
+      "clip": "animations/excited",
+      "transition_in": "excited_in",
+      "transition_out": "excited_out",
+      "fps": 12,
+      "production": "Keyframe edit of source/emotion/reference-neutral.jpg via tools/render_emotions.py (image-to-image, same side-view character). Frame 0 of this clip and of its in/out clips is source/emotion/neutral-reference.png byte for byte. In-betweens are drawn partial poses when the body moves, so the action eases onto the peak instead of popping. Small face changes are an optical-flow morph sampled across the blink. A morph is not used when it would ghost a limb or a second eye. Taller stance, open smile, blush, hands on the belly."
+    },
+    {
+      "id": "bored",
+      "zh": "无聊",
+      "priority": "low",
+      "legacy": false,
+      "clip": "animations/bored",
+      "transition_in": "bored_in",
+      "transition_out": "bored_out",
+      "fps": 12,
+      "production": "Keyframe edit of source/emotion/reference-neutral.jpg via tools/render_emotions.py (image-to-image, same side-view character). Frame 0 of this clip and of its in/out clips is source/emotion/neutral-reference.png byte for byte. In-betweens are drawn partial poses when the body moves, so the action eases onto the peak instead of popping. Small face changes are an optical-flow morph sampled across the blink. A morph is not used when it would ghost a limb or a second eye. Half-lidded eye, flat mouth, weight shifted, hands on the belly."
+    },
+    {
+      "id": "embarrassed",
+      "zh": "尴尬",
+      "priority": "normal",
+      "legacy": false,
+      "clip": "animations/embarrassed",
+      "transition_in": "embarrassed_in",
+      "transition_out": "embarrassed_out",
+      "fps": 12,
+      "production": "Keyframe edit of source/emotion/reference-neutral.jpg via tools/render_emotions.py (image-to-image, same side-view character). Frame 0 of this clip and of its in/out clips is source/emotion/neutral-reference.png byte for byte. In-betweens are drawn partial poses when the body moves, so the action eases onto the peak instead of popping. Small face changes are an optical-flow morph sampled across the blink. A morph is not used when it would ghost a limb or a second eye. Blush, ducked glance, small smile, hands on the belly."
+    },
+    {
+      "id": "curious",
+      "zh": "好奇",
+      "priority": "normal",
+      "legacy": false,
+      "clip": "animations/curious",
+      "transition_in": "curious_in",
+      "transition_out": "curious_out",
+      "fps": 12,
+      "production": "Keyframe edit of source/emotion/reference-neutral.jpg via tools/render_emotions.py (image-to-image, same side-view character). Frame 0 of this clip and of its in/out clips is source/emotion/neutral-reference.png byte for byte. In-betweens are drawn partial poses when the body moves, so the action eases onto the peak instead of popping. Small face changes are an optical-flow morph sampled across the blink. A morph is not used when it would ghost a limb or a second eye. Attentive side eye, slight forward lean, hands on the belly."
+    },
+    {
+      "id": "relieved",
+      "zh": "放松",
+      "priority": "low",
+      "legacy": false,
+      "clip": "animations/relieved",
+      "transition_in": "relieved_in",
+      "transition_out": "relieved_out",
+      "fps": 12,
+      "production": "Keyframe edit of source/emotion/reference-neutral.jpg via tools/render_emotions.py (image-to-image, same side-view character). Frame 0 of this clip and of its in/out clips is source/emotion/neutral-reference.png byte for byte. In-betweens are drawn partial poses when the body moves, so the action eases onto the peak instead of popping. Small face changes are an optical-flow morph sampled across the blink. A morph is not used when it would ghost a limb or a second eye. The one eye closed, soft smile, relaxed stand."
+    },
+    {
+      "id": "disappointed",
+      "zh": "失望",
+      "priority": "normal",
+      "legacy": false,
+      "clip": "animations/disappointed",
+      "transition_in": "disappointed_in",
+      "transition_out": "disappointed_out",
+      "fps": 12,
+      "production": "Keyframe edit of source/emotion/reference-neutral.jpg via tools/render_emotions.py (image-to-image, same side-view character). Frame 0 of this clip and of its in/out clips is source/emotion/neutral-reference.png byte for byte. In-betweens are drawn partial poses when the body moves, so the action eases onto the peak instead of popping. Small face changes are an optical-flow morph sampled across the blink. A morph is not used when it would ghost a limb or a second eye. Head lowered, frown, slumped shoulders, hands on the belly."
+    },
+    {
+      "id": "grateful",
+      "zh": "感谢",
+      "priority": "normal",
+      "legacy": false,
+      "clip": "animations/grateful",
+      "transition_in": "grateful_in",
+      "transition_out": "grateful_out",
+      "fps": 12,
+      "production": "Keyframe edit of source/emotion/reference-neutral.jpg via tools/render_emotions.py (image-to-image, same side-view character). Frame 0 of this clip and of its in/out clips is source/emotion/neutral-reference.png byte for byte. In-betweens are drawn partial poses when the body moves, so the action eases onto the peak instead of popping. Small face changes are an optical-flow morph sampled across the blink. A morph is not used when it would ghost a limb or a second eye. Forward bow, eye closed, small smile, hands on the belly."
+    },
+    {
+      "id": "worried",
+      "zh": "担心",
+      "priority": "normal",
+      "legacy": false,
+      "clip": "animations/worried",
+      "transition_in": "worried_in",
+      "transition_out": "worried_out",
+      "fps": 12,
+      "production": "Keyframe edit of source/emotion/reference-neutral.jpg via tools/render_emotions.py (image-to-image, same side-view character). Frame 0 of this clip and of its in/out clips is source/emotion/neutral-reference.png byte for byte. In-betweens are drawn partial poses when the body moves, so the action eases onto the peak instead of popping. Small face changes are an optical-flow morph sampled across the blink. A morph is not used when it would ghost a limb or a second eye. Small frown, concerned side eye, hands on the belly."
+    },
+    {
+      "id": "smug",
+      "zh": "傲娇",
+      "priority": "normal",
+      "legacy": false,
+      "clip": "animations/smug",
+      "transition_in": "smug_in",
+      "transition_out": "smug_out",
+      "fps": 12,
+      "production": "Keyframe edit of source/emotion/reference-neutral.jpg via tools/render_emotions.py (image-to-image, same side-view character). Frame 0 of this clip and of its in/out clips is source/emotion/neutral-reference.png byte for byte. In-betweens are drawn partial poses when the body moves, so the action eases onto the peak instead of popping. Small face changes are an optical-flow morph sampled across the blink. A morph is not used when it would ghost a limb or a second eye. Chin up, smirk, one hand on the hip and the other on the belly."
+    },
+    {
+      "id": "crying",
+      "zh": "哭泣",
+      "priority": "high",
+      "legacy": false,
+      "clip": "animations/crying",
+      "transition_in": "crying_in",
+      "transition_out": "crying_out",
+      "fps": 12,
+      "production": "Keyframe edit of source/emotion/reference-neutral.jpg via tools/render_emotions.py (image-to-image, same side-view character). Frame 0 of this clip and of its in/out clips is source/emotion/neutral-reference.png byte for byte. In-betweens are drawn partial poses when the body moves, so the action eases onto the peak instead of popping. Small face changes are an optical-flow morph sampled across the blink. A morph is not used when it would ghost a limb or a second eye. Eye closed, frown, one tear on the cheek, hands on the belly."
+    },
+    {
+      "id": "wronged",
+      "zh": "委屈",
+      "priority": "normal",
+      "legacy": false,
+      "clip": "animations/wronged",
+      "transition_in": "wronged_in",
+      "transition_out": "wronged_out",
+      "fps": 12,
+      "production": "Keyframe edit of source/emotion/reference-neutral.jpg via tools/render_emotions.py (image-to-image, same side-view character). Frame 0 of this clip and of its in/out clips is source/emotion/neutral-reference.png byte for byte. In-betweens are drawn partial poses when the body moves, so the action eases onto the peak instead of popping. Small face changes are an optical-flow morph sampled across the blink. A morph is not used when it would ghost a limb or a second eye. Pout, one tear, hands clasped on the belly."
+    },
+    {
+      "id": "cheer",
+      "zh": "欢呼",
+      "priority": "high",
+      "legacy": false,
+      "clip": "animations/cheer",
+      "transition_in": "cheer_in",
+      "transition_out": "cheer_out",
+      "fps": 12,
+      "production": "Keyframe edit of source/emotion/reference-neutral.jpg via tools/render_emotions.py (image-to-image, same side-view character). Frame 0 of this clip and of its in/out clips is source/emotion/neutral-reference.png byte for byte. In-betweens are drawn partial poses when the body moves, so the action eases onto the peak instead of popping. Small face changes are an optical-flow morph sampled across the blink. A morph is not used when it would ghost a limb or a second eye. Both arms raised, laughing mouth, one eye winked."
+    },
+    {
+      "id": "dizzy",
+      "zh": "晕乎",
+      "priority": "normal",
+      "legacy": false,
+      "clip": "animations/dizzy",
+      "transition_in": "dizzy_in",
+      "transition_out": "dizzy_out",
+      "fps": 12,
+      "production": "Keyframe edit of source/emotion/reference-neutral.jpg via tools/render_emotions.py (image-to-image, same side-view character). Frame 0 of this clip and of its in/out clips is source/emotion/neutral-reference.png byte for byte. In-betweens are drawn partial poses when the body moves, so the action eases onto the peak instead of popping. Small face changes are an optical-flow morph sampled across the blink. A morph is not used when it would ghost a limb or a second eye. Off-balance lean that sways side to side, half-lidded eye."
+    },
+    {
+      "id": "focused",
+      "zh": "专注",
+      "priority": "low",
+      "legacy": false,
+      "clip": "animations/focused",
+      "transition_in": "focused_in",
+      "transition_out": "focused_out",
+      "fps": 12,
+      "production": "Keyframe edit of source/emotion/reference-neutral.jpg via tools/render_emotions.py (image-to-image, same side-view character). Frame 0 of this clip and of its in/out clips is source/emotion/neutral-reference.png byte for byte. In-betweens are drawn partial poses when the body moves, so the action eases onto the peak instead of popping. Small face changes are an optical-flow morph sampled across the blink. A morph is not used when it would ghost a limb or a second eye. Narrowed eye, level mouth, slight lean in."
+    },
+    {
+      "id": "greet",
+      "zh": "打招呼",
+      "priority": "normal",
+      "legacy": false,
+      "clip": "animations/greet",
+      "transition_in": "greet_in",
+      "transition_out": "greet_out",
+      "fps": 12,
+      "production": "Keyframe edit of source/emotion/reference-neutral.jpg via tools/render_emotions.py (image-to-image, same side-view character). Frame 0 of this clip and of its in/out clips is source/emotion/neutral-reference.png byte for byte. In-betweens are drawn partial poses when the body moves, so the action eases onto the peak instead of popping. Small face changes are an optical-flow morph sampled across the blink. A morph is not used when it would ghost a limb or a second eye. One hand waves, the other stays on the belly."
+    },
+    {
+      "id": "agree",
+      "zh": "赞同",
+      "priority": "low",
+      "legacy": false,
+      "clip": "animations/agree",
+      "transition_in": "agree_in",
+      "transition_out": "agree_out",
+      "fps": 12,
+      "production": "Keyframe edit of source/emotion/reference-neutral.jpg via tools/render_emotions.py (image-to-image, same side-view character). Frame 0 of this clip and of its in/out clips is source/emotion/neutral-reference.png byte for byte. In-betweens are drawn partial poses when the body moves, so the action eases onto the peak instead of popping. Small face changes are an optical-flow morph sampled across the blink. A morph is not used when it would ghost a limb or a second eye. Nod, closed-eye smile, hands on the belly."
+    },
+    {
+      "id": "refuse",
+      "zh": "拒绝",
+      "priority": "high",
+      "legacy": false,
+      "clip": "animations/refuse",
+      "transition_in": "refuse_in",
+      "transition_out": "refuse_out",
+      "fps": 12,
+      "production": "Keyframe edit of source/emotion/reference-neutral.jpg via tools/render_emotions.py (image-to-image, same side-view character). Frame 0 of this clip and of its in/out clips is source/emotion/neutral-reference.png byte for byte. In-betweens are drawn partial poses when the body moves, so the action eases onto the peak instead of popping. Small face changes are an optical-flow morph sampled across the blink. A morph is not used when it would ghost a limb or a second eye. One palm raised in a stop, the other hand on the belly, frown."
+    },
+    {
+      "id": "ponder",
+      "zh": "思索",
+      "priority": "low",
+      "legacy": false,
+      "clip": "animations/ponder",
+      "transition_in": "ponder_in",
+      "transition_out": "ponder_out",
+      "fps": 12,
+      "production": "Keyframe edit of source/emotion/reference-neutral.jpg via tools/render_emotions.py (image-to-image, same side-view character). Frame 0 of this clip and of its in/out clips is source/emotion/neutral-reference.png byte for byte. In-betweens are drawn partial poses when the body moves, so the action eases onto the peak instead of popping. Small face changes are an optical-flow morph sampled across the blink. A morph is not used when it would ghost a limb or a second eye. One hand at the chin, the other on the belly, eye looking up."
+    },
+    {
+      "id": "annoyed",
+      "zh": "不悦",
+      "priority": "normal",
+      "legacy": false,
+      "clip": "animations/annoyed",
+      "transition_in": "annoyed_in",
+      "transition_out": "annoyed_out",
+      "fps": 12,
+      "production": "Keyframe edit of source/emotion/reference-neutral.jpg via tools/render_emotions.py (image-to-image, same side-view character). Frame 0 of this clip and of its in/out clips is source/emotion/neutral-reference.png byte for byte. In-betweens are drawn partial poses when the body moves, so the action eases onto the peak instead of popping. Small face changes are an optical-flow morph sampled across the blink. A morph is not used when it would ghost a limb or a second eye. Arms crossed in front of the chest, eye rolled up."
+    },
+    {
+      "id": "celebrate",
+      "zh": "庆祝",
+      "priority": "high",
+      "legacy": false,
+      "clip": "animations/celebrate",
+      "transition_in": "celebrate_in",
+      "transition_out": "celebrate_out",
+      "fps": 12,
+      "production": "Keyframe edit of source/emotion/reference-neutral.jpg via tools/render_emotions.py (image-to-image, same side-view character). Frame 0 of this clip and of its in/out clips is source/emotion/neutral-reference.png byte for byte. In-betweens are drawn partial poses when the body moves, so the action eases onto the peak instead of popping. Small face changes are an optical-flow morph sampled across the blink. A morph is not used when it would ghost a limb or a second eye. Both fists pumped at shoulder height, closed-eye smile."
+    },
+    {
+      "id": "hug",
+      "zh": "拥抱",
+      "priority": "normal",
+      "legacy": false,
+      "clip": "animations/hug",
+      "transition_in": "hug_in",
+      "transition_out": "hug_out",
+      "fps": 12,
+      "production": "Keyframe edit of source/emotion/reference-neutral.jpg via tools/render_emotions.py (image-to-image, same side-view character). Frame 0 of this clip and of its in/out clips is source/emotion/neutral-reference.png byte for byte. In-betweens are drawn partial poses when the body moves, so the action eases onto the peak instead of popping. Small face changes are an optical-flow morph sampled across the blink. A morph is not used when it would ghost a limb or a second eye. One arm reaches forward, the other hand stays on the belly, eye closed."
+    },
+    {
+      "id": "shocked",
+      "zh": "震住",
+      "priority": "high",
+      "legacy": false,
+      "clip": "animations/shocked",
+      "transition_in": "shocked_in",
+      "transition_out": "shocked_out",
+      "fps": 12,
+      "production": "Keyframe edit of source/emotion/reference-neutral.jpg via tools/render_emotions.py (image-to-image, same side-view character). Frame 0 of this clip and of its in/out clips is source/emotion/neutral-reference.png byte for byte. In-betweens are drawn partial poses when the body moves, so the action eases onto the peak instead of popping. Small face changes are an optical-flow morph sampled across the blink. A morph is not used when it would ghost a limb or a second eye. Lean back, small open mouth, one side eye."
+    }
+  ]
+}

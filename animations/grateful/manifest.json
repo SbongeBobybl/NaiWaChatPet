@@ -1,0 +1,81 @@
+{
+  "name": "grateful",
+  "emotion": "grateful",
+  "fps": 12,
+  "frameCount": 6,
+  "loop": false,
+  "priority": 25,
+  "mouthAnchor": {
+    "frame": 0,
+    "x": 153.5,
+    "y": 138.0
+  },
+  "mouthKeyframes": [
+    {
+      "frame": 0,
+      "x": 153.5,
+      "y": 138.0
+    },
+    {
+      "frame": 1,
+      "x": 124.47,
+      "y": 139.39
+    },
+    {
+      "frame": 2,
+      "x": 124.47,
+      "y": 139.39
+    },
+    {
+      "frame": 3,
+      "x": 93.58,
+      "y": 140.88
+    },
+    {
+      "frame": 4,
+      "x": 93.58,
+      "y": 140.88
+    },
+    {
+      "frame": 5,
+      "x": 93.58,
+      "y": 140.88
+    }
+  ],
+  "transitionIn": "grateful_in",
+  "transitionOut": "grateful_out",
+  "canvas": {
+    "width": 420,
+    "height": 560
+  },
+  "groundY": 540,
+  "frames": [
+    {
+      "file": "0000.png",
+      "sha256": "cc055177b4847597a08443d299de01ef9973aa4758d012f8433733324bd0e3e2"
+    },
+    {
+      "file": "0001.png",
+      "sha256": "4fcbf4f4fff00daeba28209d9c092b5dbacced83e6b060cda0b7b8f4957afd07"
+    },
+    {
+      "file": "0002.png",
+      "sha256": "4fcbf4f4fff00daeba28209d9c092b5dbacced83e6b060cda0b7b8f4957afd07"
+    },
+    {
+      "file": "0003.png",
+      "sha256": "df617509cc5ffe1c1a3b4821bde2780e4b16e978d6177254e31d0dc922f683df"
+    },
+    {
+      "file": "0004.png",
+      "sha256": "df617509cc5ffe1c1a3b4821bde2780e4b16e978d6177254e31d0dc922f683df"
+    },
+    {
+      "file": "0005.png",
+      "sha256": "df617509cc5ffe1c1a3b4821bde2780e4b16e978d6177254e31d0dc922f683df"
+    }
+  ],
+  "reviewed": true,
+  "sourceSha256": "35525422a9c3744db828e71efc865abd14a7cf2085481127bfac00368209ad12",
+  "issues": []
+}
