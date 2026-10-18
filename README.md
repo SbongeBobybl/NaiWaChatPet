@@ -210,12 +210,6 @@ python scripts/test_release_privacy.py
 
 </details>
 
-## 上传 GitHub
-
-把源码 ZIP 解压后的内容提交到仓库根目录，README 会自动显示目录跳转、可折叠说明和操作表格。安装包、源码 ZIP 与 `SHA256SUMS.txt` 放在同一 **GitHub Release**，不要把二进制包提交进 Git。发布步骤见 [发布检查表](docs/RELEASE-CHECKLIST.md)。
-
-本交付只准备本地文件，不会自动替你创建仓库、上传或发布。
-
 ## 许可证与来源
 
-整理引擎基于 DeskBox v1.5.8，保留 [GPL-3.0 许可证全文](LICENSE) 与源代码中的版权声明。本仓库是奶蛙集成修改版，不是 DeskBox 官方发行版。分发二进制时应同时提供本版本对应源码、构建脚本和许可证。第三方依赖保留各自许可证，见 [NOTICE.md](NOTICE.md)。
+整理引擎基于 DeskBox v1.5.8，项目来源https://github.com/Tianyu199509/DeskBox 保留 [GPL-3.0 许可证全文](LICENSE) 与源代码中的版权声明。本仓库是奶蛙集成修改版，不是 DeskBox 官方发行版。分发二进制时应同时提供本版本对应源码、构建脚本和许可证。第三方依赖保留各自许可证，见 [NOTICE.md](NOTICE.md)。
