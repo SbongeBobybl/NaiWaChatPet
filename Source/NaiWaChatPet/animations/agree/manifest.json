@@ -1,0 +1,28 @@
+{
+  "name": "agree",
+  "emotion": "agree",
+  "fps": 12,
+  "frameCount": 1,
+  "loop": true,
+  "priority": 16,
+  "mouthAnchor": {
+    "frame": 0,
+    "x": 180,
+    "y": 108
+  },
+  "transitionIn": "",
+  "transitionOut": "",
+  "canvas": {
+    "width": 420,
+    "height": 560
+  },
+  "groundY": 540,
+  "frames": [
+    {
+      "file": "0000.png",
+      "sha256": "3495a085d050fabe2478347a1401fc952aac5948274701f8ae271140276219f0"
+    }
+  ],
+  "reviewed": true,
+  "sourceSha256": "7d135ca5c5f0bf01bce90398acb11f181e6ad96c8f5996f0a3b909aa1714351b"
+}

@@ -1,0 +1,28 @@
+{
+  "name": "celebrate",
+  "emotion": "celebrate",
+  "fps": 12,
+  "frameCount": 1,
+  "loop": true,
+  "priority": 28,
+  "mouthAnchor": {
+    "frame": 0,
+    "x": 180,
+    "y": 108
+  },
+  "transitionIn": "",
+  "transitionOut": "",
+  "canvas": {
+    "width": 420,
+    "height": 560
+  },
+  "groundY": 540,
+  "frames": [
+    {
+      "file": "0000.png",
+      "sha256": "795956ec1c3aabe35672003de7ed27ac532f9e11e2b3b14842d7aba0526fb59a"
+    }
+  ],
+  "reviewed": true,
+  "sourceSha256": "3e77969fa4584ff4b9c10c70d0ac1dee940c51d9435c03604217ca4cb6be6797"
+}

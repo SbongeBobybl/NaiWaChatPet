@@ -1,0 +1,28 @@
+{
+  "name": "curious",
+  "emotion": "curious",
+  "fps": 12,
+  "frameCount": 1,
+  "loop": true,
+  "priority": 22,
+  "mouthAnchor": {
+    "frame": 0,
+    "x": 180,
+    "y": 108
+  },
+  "transitionIn": "",
+  "transitionOut": "",
+  "canvas": {
+    "width": 420,
+    "height": 560
+  },
+  "groundY": 540,
+  "frames": [
+    {
+      "file": "0000.png",
+      "sha256": "978318cc54cc3695aabe9a0e8324cfb49f7fe85b65f9873b85bbdf563618485a"
+    }
+  ],
+  "reviewed": true,
+  "sourceSha256": "6b555279c68c794b2d5f3a849894025edac9091ce60b3e8b8fd79df27d179e67"
+}

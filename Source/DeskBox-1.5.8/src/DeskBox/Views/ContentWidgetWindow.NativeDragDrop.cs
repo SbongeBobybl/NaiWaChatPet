@@ -1,0 +1,1551 @@
+using DeskBox.Controls;
+using DeskBox.Controls.WidgetContents;
+using DeskBox.Helpers;
+using DeskBox.Models;
+using DeskBox.Platform;
+using DeskBox.Services;
+using DeskBox.ViewModels;
+using Microsoft.UI.Xaml;
+using Microsoft.UI.Xaml.Controls;
+using Microsoft.UI.Xaml.Input;
+using Microsoft.UI.Xaml.Media;
+using Windows.ApplicationModel.DataTransfer;
+
+namespace DeskBox.Views;
+
+public sealed partial class ContentWidgetWindow
+{
+    private static readonly UIntPtr ContentFileDropSubclassId = new(0xDDB1);
+    private const string ContentBridgeWindowClass =
+        "Microsoft.UI.Content.DesktopChildSiteBridge";
+
+    private Win32Helper.SubclassProc? _nativeFileDropSubclassProc;
+    private readonly Dictionary<IntPtr, NativeDropTarget>
+        _nativeFileDropTargets = [];
+    private bool _isNativeFileDropSubclassInstalled;
+    private DragEventHandler? _groupFileDropDragEnterHandler;
+    private DragEventHandler? _groupFileDropDragOverHandler;
+    private DragEventHandler? _groupFileDropDragLeaveHandler;
+    private DragEventHandler? _groupFileDropDropHandler;
+    private CancellationTokenSource? _groupFileDropPollCts;
+    private Microsoft.UI.Dispatching.DispatcherQueueTimer?
+        _nativeFileDropRegistrationTimer;
+    private int _nativeFileDropRegistrationAttempts;
+    private Task? _groupFileDropCacheTask;
+    private DroppedFileBatch? _groupFileDropBatch;
+    private CancellationTokenSource? _pendingNativeFileDropCts;
+    private DateTimeOffset _lastXamlFileDropUtc = DateTimeOffset.MinValue;
+    private bool _isCachingGroupFileDrop;
+    private bool _isGroupFileDropTracking;
+    private bool _isGroupFileManualImporting;
+    private long _nativeFileDropPointerGeneration;
+    private long _groupFileDropGeneration;
+    private bool _groupFileDropFormatCached;
+    private bool _groupFileDropRequiresFallback;
+    private WidgetItem? _nativeFileDropItemTarget;
+    // DropIntentEvent is raised immediately before the legacy DropEvent. The
+    // flag prevents the compatibility callback from queueing the same import a
+    // second time while keeping DropEvent available to older consumers.
+    private bool _nativeDropIntentHandledForLegacyCallback;
+    // The application shortcut under the drag pointer, when the drop should
+    // open the dragged files with the linked application instead of importing.
+    private WidgetItem? _nativeFileDropLaunchTarget;
+
+    /// <summary>
+    /// File members in a group share this window's HWND. Install the same two
+    /// native input paths as a standalone file widget: WM_DROPFILES for apps
+    /// such as WeChat and an OLE IDropTarget for browsers' virtual files.
+    /// </summary>
+    protected override void ConfigureWindowExtra()
+    {
+        Win32Helper.AllowShellDragDropMessages(HWnd);
+        InstallNativeFileDropBridge(registerDropTarget: false);
+    }
+
+    private void InstallNativeFileDropBridge(bool registerDropTarget = true)
+    {
+        _nativeFileDropSubclassProc ??= NativeFileDropSubclassProc;
+        if (!_isNativeFileDropSubclassInstalled)
+        {
+            _isNativeFileDropSubclassInstalled = Win32Helper.SetWindowSubclass(
+                HWnd,                _nativeFileDropSubclassProc,                ContentFileDropSubclassId,                UIntPtr.Zero);
+            App.LogVerbose(
+                $"[DropDiagnostic] content id={_config.Id} stage=NativeSubclassInstall " +
+                $"hwnd=0x{HWnd.ToInt64():X} installed={_isNativeFileDropSubclassInstalled}");
+        }
+
+        if (!registerDropTarget)
+        {
+            return;
+        }
+
+        foreach (IntPtr targetWindow in GetNativeFileDropWindowHandles())
+        {
+            if (_nativeFileDropTargets.TryGetValue(
+                    targetWindow,                    out NativeDropTarget? existingTarget))
+            {
+                existingTarget.Register();
+                continue;
+            }
+
+            try
+            {
+                var target = new NativeDropTarget(
+                    targetWindow,                    ShouldDefaultNativeFileDropToMove,                    CreateNativeFileDropDescription,                    ShouldUseNativeFileDropVisual,                    ShouldFollowWindowsNativeFileDrop);
+                target.DragEnterEvent += NativeFileDropTarget_DragEnterEvent;
+                target.DragOverEvent += NativeFileDropTarget_DragOverEvent;
+                target.DragLeaveEvent += NativeFileDropTarget_DragLeaveEvent;
+                target.LaunchDropHandler = HandleNativeLaunchDrop;
+                target.UndisplayablePathProbe = IsNativeFileDropPathUndisplayable;
+                target.SameVolumeProbe = IsNativeDropOnSameVolume;
+                target.ImportBusyProbe = IsNativeDropImportBusy;
+                target.UndisplayableDropBlocked += NativeFileDropTarget_UndisplayableDropBlocked;
+                target.DropIntentEvent += NativeFileDropTarget_DropIntentEvent;
+                target.DropEvent += NativeFileDropTarget_DropEvent;
+                target.Register();
+                _nativeFileDropTargets[targetWindow] = target;
+            }
+            catch (Exception ex)
+            {
+                App.Log(
+                    $"[DropTarget] Failed to register grouped IDropTarget " +
+                    $"hwnd=0x{targetWindow.ToInt64():X}: {ex.Message}");
+            }
+        }
+    }
+
+    private IReadOnlyList<IntPtr> GetNativeFileDropWindowHandles()
+    {
+        var handles = new List<IntPtr> { HWnd };
+        _ = Win32Helper.EnumChildWindows(
+            HWnd,            (childWindow,_) =>
+            {
+                var className = new System.Text.StringBuilder(128);
+                int length = Win32Helper.GetClassName(
+                    childWindow,                    className,                    className.Capacity);
+                if (length > 0 && string.Equals(
+                        className.ToString(),                        ContentBridgeWindowClass,                        StringComparison.Ordinal))
+                {
+                    handles.Add(childWindow);
+                }
+
+                return true;
+            },            IntPtr.Zero);
+        return handles;
+    }
+
+    private bool HasRegisteredContentBridgeDropTarget()
+    {
+        foreach ((IntPtr window, NativeDropTarget target) in
+                 _nativeFileDropTargets)
+        {
+            if (window != HWnd && target.IsRegistered)
+            {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    private void QueueNativeFileDropTargetRegistration()
+    {
+        if (HasRegisteredContentBridgeDropTarget() ||
+            _nativeFileDropRegistrationTimer is not null)
+        {
+            return;
+        }
+
+        _nativeFileDropRegistrationAttempts = 0;
+        _nativeFileDropRegistrationTimer = DispatcherQueue.CreateTimer();
+        _nativeFileDropRegistrationTimer.Interval =
+            TimeSpan.FromMilliseconds(75);
+        _nativeFileDropRegistrationTimer.IsRepeating = true;
+        _nativeFileDropRegistrationTimer.Tick +=
+            NativeFileDropRegistrationTimer_Tick;
+        _nativeFileDropRegistrationTimer.Start();
+    }
+
+    private void NativeFileDropRegistrationTimer_Tick(
+        Microsoft.UI.Dispatching.DispatcherQueueTimer sender,        object args)
+    {
+        if (IsClosing)
+        {
+            ReleaseNativeFileDropRegistrationTimer();
+            return;
+        }
+
+        _nativeFileDropRegistrationAttempts++;
+        InstallNativeFileDropBridge();
+        if (HasRegisteredContentBridgeDropTarget())
+        {
+            ReleaseNativeFileDropRegistrationTimer();
+            return;
+        }
+
+        if (_nativeFileDropRegistrationAttempts >= 40)
+        {
+            App.Log(
+                $"[DropTarget] WinUI content child was not available for registration " +
+                $"hwnd=0x{HWnd.ToInt64():X}");
+            ReleaseNativeFileDropRegistrationTimer();
+        }
+    }
+
+    private void ReleaseNativeFileDropRegistrationTimer()
+    {
+        if (_nativeFileDropRegistrationTimer is null)
+        {
+            return;
+        }
+
+        _nativeFileDropRegistrationTimer.Stop();
+        _nativeFileDropRegistrationTimer.Tick -=
+            NativeFileDropRegistrationTimer_Tick;
+        _nativeFileDropRegistrationTimer = null;
+    }
+
+    private bool ShouldUseNativeFileDropVisual()
+    {
+        return CurrentContent switch
+        {
+            FileWidgetContentAdapter
+            {
+                SuppressesNativeShellDragVisual: false
+            } => true,            _ => false
+        };
+    }
+
+    private bool ShouldDefaultNativeFileDropToMove()
+    {
+        return CurrentContent is FileWidgetContentAdapter &&
+               string.Equals(
+                   App.Current.SettingsService.Settings.ManagedDropAction,                   SettingsService.ManagedDropActionMove,                   StringComparison.Ordinal);
+    }
+
+    private bool ShouldFollowWindowsNativeFileDrop()
+    {
+        return string.Equals(
+            App.Current.SettingsService.Settings.ManagedDropAction,            SettingsService.ManagedDropActionFollowWindows,            StringComparison.Ordinal);
+    }
+
+    private NativeDropDescriptionText? CreateNativeFileDropDescription(
+        uint effect)
+    {
+        if (effect == NativeDropEffectPolicy.None)
+        {
+            return null;
+        }
+
+        if (CurrentContent is FileWidgetContentAdapter &&
+            _nativeFileDropLaunchTarget is
+            {
+                Path.Length: > 0,
+                Name.Length: > 0
+            } launchTarget)
+        {
+            string openWith = ToShellDropDescriptionMessage(
+                App.Current.LocalizationService.Format(
+                    "Widget.DropOnShortcutOpenWith",                    launchTarget.Name));
+            return openWith.Contains("%1",StringComparison.Ordinal)
+                ? new NativeDropDescriptionText(openWith,launchTarget.Name)
+                : new NativeDropDescriptionText("%1",openWith);
+        }
+
+        if (CurrentContent is FileWidgetContentAdapter &&
+            _nativeFileDropItemTarget is WidgetStackItem stack)
+        {
+            string stackMessage = ToShellDropDescriptionMessage(
+                App.Current.LocalizationService.T(
+                    "Widget.Stack.DragCaption.Import"));
+            return stackMessage.Contains("%1",StringComparison.Ordinal)
+                ? new NativeDropDescriptionText(stackMessage,stack.Name)
+                : null;
+        }
+
+        string? localizationKey = effect switch
+        {
+            NativeDropEffectPolicy.Copy => "Widget.CopyToFolder",            NativeDropEffectPolicy.Move => "Widget.MoveToFolder",            NativeDropEffectPolicy.Link => "Widget.CreateShortcut",            _ => null
+        };
+        if (localizationKey is null)
+        {
+            return null;
+        }
+
+        string message = ToShellDropDescriptionMessage(
+            App.Current.LocalizationService.T(localizationKey));
+        if (effect == NativeDropEffectPolicy.Link &&
+            !message.Contains("%1",StringComparison.Ordinal))
+        {
+            return new NativeDropDescriptionText("%1",message);
+        }
+        if (!message.Contains("%1",StringComparison.Ordinal))
+        {
+            return null;
+        }
+
+        string targetName = _nativeFileDropItemTarget is
+            {
+                IsFolder: true,
+                Name.Length: > 0
+            } folder
+                ? folder.Name
+                : string.IsNullOrWhiteSpace(_config.Name)
+                    ? "DeskBox"
+                    : _config.Name.Trim();
+        return new NativeDropDescriptionText(message,targetName);
+    }
+
+    internal static string ToShellDropDescriptionMessage(string localized)
+    {
+        string message = localized.Replace(
+            "{0}",            "%1",            StringComparison.Ordinal);
+        string[] quotedMarkers =
+        [
+            "\"%1\"",            "“%1”",            "„%1“",            "«%1»",            "« %1 »",            "「%1」"
+        ];
+        foreach (string marker in quotedMarkers)
+        {
+            message = message.Replace(
+                marker,                "%1",                StringComparison.Ordinal);
+        }
+
+        return message;
+    }
+
+    /// <summary>
+    /// WinUI can issue DragLeave instead of Drop for some OLE sources (notably
+    /// WeChat). Observe the routed events at the surface host, including events
+    /// already handled by the nested file content, and commit a pre-cached
+    /// payload only when mouse release happened over this HWND.
+    /// </summary>
+    private void InstallGroupFileDropFallbackHandlers()
+    {
+        if (_groupFileDropDragEnterHandler is not null)
+        {
+            return;
+        }
+
+        _groupFileDropDragEnterHandler = GroupFileDrop_DragEnter;
+        _groupFileDropDragOverHandler = GroupFileDrop_DragOver;
+        _groupFileDropDragLeaveHandler = GroupFileDrop_DragLeave;
+        _groupFileDropDropHandler = GroupFileDrop_Drop;
+        RootGrid.AddHandler(
+            UIElement.DragEnterEvent,            _groupFileDropDragEnterHandler,            handledEventsToo: true);
+        RootGrid.AddHandler(
+            UIElement.DragOverEvent,            _groupFileDropDragOverHandler,            handledEventsToo: true);
+        RootGrid.AddHandler(
+            UIElement.DragLeaveEvent,            _groupFileDropDragLeaveHandler,            handledEventsToo: true);
+        RootGrid.AddHandler(
+            UIElement.DropEvent,            _groupFileDropDropHandler,            handledEventsToo: true);
+    }
+
+    private void RemoveGroupFileDropFallbackHandlers()
+    {
+        StopGroupFileDropTracking(disposeCachedBatch: true);
+        if (_groupFileDropDragEnterHandler is null)
+        {
+            return;
+        }
+
+        RootGrid.RemoveHandler(
+            UIElement.DragEnterEvent,            _groupFileDropDragEnterHandler);
+        RootGrid.RemoveHandler(
+            UIElement.DragOverEvent,            _groupFileDropDragOverHandler!);
+        RootGrid.RemoveHandler(
+            UIElement.DragLeaveEvent,            _groupFileDropDragLeaveHandler!);
+        RootGrid.RemoveHandler(
+            UIElement.DropEvent,            _groupFileDropDropHandler!);
+        _groupFileDropDragEnterHandler = null;
+        _groupFileDropDragOverHandler = null;
+        _groupFileDropDragLeaveHandler = null;
+        _groupFileDropDropHandler = null;
+    }
+
+    private void GroupFileDrop_DragEnter(object sender,DragEventArgs e)
+    {
+        BeginGroupFileDropTracking(e.DataView);
+    }
+
+    private void GroupFileDrop_DragOver(object sender,DragEventArgs e)
+    {
+        BeginGroupFileDropTracking(e.DataView);
+    }
+
+    private void GroupFileDrop_DragLeave(object sender,DragEventArgs e)
+    {
+        // DragLeave is routed from nested elements too. Defer one dispatcher
+        // turn and inspect the real pointer HWND so moving between children in
+        // the same group does not cancel a valid drop target.
+        DispatcherQueue.TryEnqueue(() =>
+        {
+            if (IsClosing || IsPointerOverContentWindow())
+            {
+                return;
+            }
+
+            StopGroupFileDropTracking(disposeCachedBatch: true);
+            App.Log(
+                $"[DropDiagnostic] Group drag leave cleared tracking " +
+                $"id={_config.Id} hwnd=0x{HWnd.ToInt64():X}");
+        });
+    }
+
+    private void GroupFileDrop_Drop(object sender,DragEventArgs e)
+    {
+        // The nested FileSurfaceContent received a normal Drop event, so the
+        // fallback must not import the cached source a second time.
+        _lastXamlFileDropUtc = DateTimeOffset.UtcNow;
+        CancelPendingNativeFileDropFallback();
+        StopGroupFileDropTracking(disposeCachedBatch: true);
+    }
+
+    private void BeginGroupFileDropTracking(DataPackageView dataView)
+    {
+        if (IsClosing ||
+            CurrentContent is not FileWidgetContentAdapter file ||
+            file.IsImportBusy ||
+            file.IsInternalReorderDrag(dataView))
+        {
+            return;
+        }
+
+        // DragEnter is routed again while the pointer crosses nested child
+        // elements. Cache the OLE format scan until a real window leave or a
+        // Drop calls StopGroupFileDropTracking.
+        if (!_groupFileDropFormatCached)
+        {
+            _groupFileDropRequiresFallback =
+                RequiresGroupManualDropFallback(dataView);
+            _groupFileDropFormatCached = true;
+        }
+
+        if (!_groupFileDropRequiresFallback)
+        {
+            return;
+        }
+
+        if (!_isGroupFileDropTracking)
+        {
+            _isGroupFileDropTracking = true;
+            _groupFileDropGeneration++;
+            DisposeGroupFileDropBatch();
+        }
+
+        long generation = _groupFileDropGeneration;
+        if (_groupFileDropBatch is null && !_isCachingGroupFileDrop)
+        {
+            _isCachingGroupFileDrop = true;
+            _groupFileDropCacheTask = CacheGroupFileDropAsync(dataView,generation);
+        }
+
+        EnsureGroupFileDropPoll(generation);
+    }
+
+    private static bool RequiresGroupManualDropFallback(DataPackageView dataView)
+    {
+        bool hasFileDrop = dataView.AvailableFormats.Any(format =>
+            format.Contains("FileDrop",StringComparison.OrdinalIgnoreCase));
+        bool hasVirtualFileDescriptor = dataView.AvailableFormats.Any(format =>
+            format.Contains("FileGroupDescriptor",StringComparison.OrdinalIgnoreCase));
+        return hasFileDrop && !hasVirtualFileDescriptor;
+    }
+
+    private async Task CacheGroupFileDropAsync(
+        DataPackageView dataView,        long generation)
+    {
+        DroppedFileBatch? batch = null;
+        try
+        {
+            batch = await DeskBoxDragData.TryGetDroppedFilesAsync(dataView);
+        }
+        catch (Exception ex)
+        {
+            App.Log($"[DropDiagnostic] Group drop pre-cache failed: {ex.Message}");
+        }
+
+        if (generation != _groupFileDropGeneration ||
+            !_isGroupFileDropTracking)
+        {
+            batch?.Dispose();
+            return;
+        }
+
+        _isCachingGroupFileDrop = false;
+        DisposeGroupFileDropBatch();
+        _groupFileDropBatch = batch;
+        App.Log(
+            $"[DropDiagnostic] Group drop pre-cache count=" +
+            $"{batch?.Files.Count ?? 0}");
+    }
+
+    private void EnsureGroupFileDropPoll(long generation)
+    {
+        if (_groupFileDropPollCts is not null)
+        {
+            return;
+        }
+
+        _groupFileDropPollCts = new CancellationTokenSource();
+        CancellationToken token = _groupFileDropPollCts.Token;
+        _ = Task.Run(async () =>
+        {
+            using var timeoutCts = CancellationTokenSource.CreateLinkedTokenSource(token);
+            timeoutCts.CancelAfter(TimeSpan.FromSeconds(5));
+            try
+            {
+                while (!timeoutCts.Token.IsCancellationRequested)
+                {
+                    await Task.Delay(30,timeoutCts.Token);
+                    if (Win32Helper.IsKeyDown(0x01))
+                    {
+                        continue;
+                    }
+
+                    DispatcherQueue.TryEnqueue(
+                        () => OnGroupFileDropPollDetectedRelease(generation));
+                    return;
+                }
+            }
+            catch (TaskCanceledException)
+            {
+                // A real Drop event or a new drag ended this fallback path.
+            }
+            catch (Exception ex)
+            {
+                App.Log($"[DropDiagnostic] Group drop poll failed: {ex.Message}");
+            }
+        },token);
+    }
+
+    private async void OnGroupFileDropPollDetectedRelease(long generation)
+    {
+        // Give a healthy WinUI Drop event a chance to arrive before falling
+        // back. Its handled-events-too observer clears the tracking state.
+        await Task.Delay(80);
+        if (generation != _groupFileDropGeneration ||
+            !_isGroupFileDropTracking ||
+            _isGroupFileManualImporting)
+        {
+            return;
+        }
+
+        if (!IsPointerOverContentWindow())
+        {
+            StopGroupFileDropTracking(disposeCachedBatch: true);
+            return;
+        }
+
+        if (_groupFileDropBatch is null &&
+            _groupFileDropCacheTask is { IsCompleted: false } cacheTask)
+        {
+            await Task.WhenAny(cacheTask,Task.Delay(300));
+        }
+
+        if (generation != _groupFileDropGeneration ||
+            !_isGroupFileDropTracking)
+        {
+            return;
+        }
+
+        DroppedFileBatch? batch = _groupFileDropBatch;
+        _groupFileDropBatch = null;
+        if (batch is null || batch.Files.Count == 0)
+        {
+            batch?.Dispose();
+            StopGroupFileDropTracking(disposeCachedBatch: false);
+            App.Log("[DropDiagnostic] Group fallback found no importable cached files.");
+            return;
+        }
+
+        _isGroupFileManualImporting = true;
+        StopGroupFileDropTracking(disposeCachedBatch: false);
+        try
+        {
+            if (CurrentContent is FileWidgetContentAdapter file)
+            {
+                file.SetHostWindowHandle(HWnd);
+                bool containsTemporaryFiles = batch.Files.Any(
+                    droppedFile => droppedFile.ForceManagedCopy);
+                await file.ImportNativeDroppedFilesAsync(
+                    batch.Files.Select(droppedFile => droppedFile.Path).ToArray(),                    containsTemporaryFiles);
+            }
+        }
+        finally
+        {
+            batch.Dispose();
+            _isGroupFileManualImporting = false;
+        }
+    }
+
+    private bool IsPointerOverContentWindow()
+    {
+        if (!Win32Helper.GetCursorPos(out var cursor))
+        {
+            return false;
+        }
+
+        IntPtr pointerWindow = Win32Helper.WindowFromPoint(cursor);
+        return pointerWindow != IntPtr.Zero &&
+               Win32Helper.GetAncestor(pointerWindow,Win32Helper.GA_ROOT) ==
+               Win32Helper.GetAncestor(HWnd,Win32Helper.GA_ROOT);
+    }
+
+    private void StopGroupFileDropTracking(bool disposeCachedBatch)
+    {
+        _isGroupFileDropTracking = false;
+        _groupFileDropGeneration++;
+        _isCachingGroupFileDrop = false;
+        _groupFileDropCacheTask = null;
+        _groupFileDropFormatCached = false;
+        _groupFileDropRequiresFallback = false;
+        if (_groupFileDropPollCts is not null)
+        {
+            _groupFileDropPollCts.Cancel();
+            _groupFileDropPollCts.Dispose();
+            _groupFileDropPollCts = null;
+        }
+
+        if (disposeCachedBatch)
+        {
+            DisposeGroupFileDropBatch();
+        }
+    }
+
+    private void DisposeGroupFileDropBatch()
+    {
+        _groupFileDropBatch?.Dispose();
+        _groupFileDropBatch = null;
+    }
+
+    private void RemoveNativeFileDropBridge()
+    {
+        ReleaseNativeFileDropRegistrationTimer();
+        CancelPendingNativeFileDropFallback();
+        if (_isNativeFileDropSubclassInstalled &&
+            _nativeFileDropSubclassProc is not null)
+        {
+            Win32Helper.RemoveWindowSubclass(
+                HWnd,                _nativeFileDropSubclassProc,                ContentFileDropSubclassId);
+            _isNativeFileDropSubclassInstalled = false;
+        }
+
+        foreach (NativeDropTarget target in _nativeFileDropTargets.Values)
+        {
+            target.DragEnterEvent -=
+                NativeFileDropTarget_DragEnterEvent;
+            target.DragOverEvent -=
+                NativeFileDropTarget_DragOverEvent;
+            target.DragLeaveEvent -=
+                NativeFileDropTarget_DragLeaveEvent;
+            target.LaunchDropHandler = null;
+            target.DropIntentEvent -= NativeFileDropTarget_DropIntentEvent;
+            target.DropEvent -= NativeFileDropTarget_DropEvent;
+            target.Dispose();
+        }
+
+        _nativeFileDropTargets.Clear();
+    }
+
+    private IntPtr NativeFileDropSubclassProc(
+        IntPtr hWnd,        uint message,        UIntPtr wParam,        IntPtr lParam,        UIntPtr uIdSubclass,        UIntPtr dwRefData)
+    {
+        if (message == Win32Helper.WM_DROPFILES)
+        {
+            IReadOnlyList<string> paths = Win32Helper.GetDroppedFilePaths(
+                (IntPtr)wParam);
+            App.Log(
+                $"[DropDiagnostic] content id={_config.Id} stage=NativeDropFiles " +
+                $"count={paths.Count}");
+            if (!TryConsumeLegacyDropFilesAsLaunch(paths))
+            {
+                QueueNativeFileDropImport(
+                    paths,                    containsTemporaryFiles: false,                    copyWhenMapped: null);
+            }
+
+            return IntPtr.Zero;
+        }
+
+        // Any press inside this window must close an open native context menu.
+        // These windows are created without activation, so clicking one does
+        // not deactivate the menu's owner, and the Shell menu would otherwise
+        // stay on screen until an item or Escape is chosen.
+        if (IsContextMenuDismissingMessage(message))
+        {
+            ShellContextMenuProxy.CancelOpenMenu();
+        }
+
+        return Win32Helper.DefSubclassProc(hWnd,message,wParam,lParam);
+    }
+
+    private static bool IsContextMenuDismissingMessage(uint message) =>
+        message is Win32Helper.WM_LBUTTONDOWN
+            or Win32Helper.WM_RBUTTONDOWN
+            or Win32Helper.WM_MBUTTONDOWN
+            or Win32Helper.WM_XBUTTONDOWN;
+
+    /// <summary>
+    /// The legacy <c>WM_DROPFILES</c> entry point (enabled by DragAcceptFiles)
+    /// receives the same physical release as the OLE drop target. It must not
+    /// import a gesture another entry point already resolved as a launch:
+    /// importing relocates the user's files, which is exactly what dropping on
+    /// an application shortcut must never do. Returns true when the drop is
+    /// consumed and must not be imported.
+    ///
+    /// Deliberately no delegation here: this runs on the UI thread, and probing
+    /// showed that handing a synthesized CF_HDROP object to a shortcut's drop
+    /// handler can stall for seconds (or longer) on executable targets. The OLE
+    /// path owns delegation because it holds the drag source's real data object.
+    /// </summary>
+    private bool TryConsumeLegacyDropFilesAsLaunch(IReadOnlyList<string> paths)
+    {
+        if (CurrentContent is not FileWidgetContentAdapter fileSurface || paths.Count == 0)
+        {
+            return false;
+        }
+
+        if (!fileSurface.WasLaunchConsumedRecently())
+        {
+            return false;
+        }
+
+        App.LogVerbose(
+            "[DragProtocol] legacy WM_DROPFILES stood down after a launch " +
+            $"consumed widget={_config.Id}");
+        _nativeFileDropLaunchTarget = null;
+        RunOnNativeFileDropUiThread(file =>
+            file.ClearPendingNativeDropInsertion());
+        return true;
+    }
+
+    private void NativeFileDropTarget_DragEnterEvent(
+        int screenX,        int screenY,        bool hasFileData)
+    {
+        long pointerGeneration =
+            System.Threading.Interlocked.Increment(
+                ref _nativeFileDropPointerGeneration);
+        ObserveNativeFileDragPointer(
+            screenX,            screenY,            hasFileData,            GetNativeFileDropPathHints(),            pointerGeneration);
+    }
+
+    private void NativeFileDropTarget_DragOverEvent(int screenX,int screenY)
+    {
+        bool hasFileData = _nativeFileDropTargets.Values.Any(
+            target => target.HasFileData);
+        long pointerGeneration =
+            System.Threading.Interlocked.Increment(
+                ref _nativeFileDropPointerGeneration);
+        ObserveNativeFileDragPointer(
+            screenX,            screenY,            hasFileData,            GetNativeFileDropPathHints(),            pointerGeneration);
+    }
+
+    private void NativeFileDropTarget_DragLeaveEvent()
+    {
+        System.Threading.Interlocked.Increment(
+            ref _nativeFileDropPointerGeneration);
+        _nativeFileDropItemTarget = null;
+        _nativeFileDropLaunchTarget = null;
+        RunOnNativeFileDropUiThread(file =>
+            file.ClearDragSessionVisualState());
+        RunOnUi(() =>
+        {
+            WidgetShellControl.CancelGroupTabDragHover();
+            WidgetShellControl.SetGroupTabFileDragActive(false);
+        });
+    }
+
+    private void ObserveNativeFileDragPointer(
+        int screenX,        int screenY,        bool hasFileData,        IReadOnlyList<string>? pathHints = null,        long pointerGeneration = 0)
+    {
+        ObserveNativeGroupTabDragHover(
+            screenX,            screenY,            hasFileData,            pointerGeneration);
+        RunOnNativeFileDropUiThread(file =>
+        {
+            if (pointerGeneration != 0 &&
+                pointerGeneration != System.Threading.Interlocked.Read(
+                    ref _nativeFileDropPointerGeneration))
+            {
+                // Native OLE callbacks run off the UI thread. A queued
+                // DragOver can arrive after a newer pointer location has
+                // already been received, which used to re-apply an old stack
+                // target over the user's current non-stack location.
+                return;
+            }
+
+            // A DeskBox-originated drag's shortcut launch is owned by the
+            // XAML completion path, which applies the internal-drag launch
+            // policy (icon hit-test, popover-member and self-file exclusion).
+            // Arming the native launch target for it would launch the
+            // application twice. Folder/stack tile targets stay armed: WinUI
+            // does not deliver the routed Drop to item surfaces for a
+            // same-ListView drag, so the native fallback remains the only
+            // channel that can complete those.
+            bool isSelfDrag = hasFileData &&
+                pathHints is { Count: > 0 } hints &&
+                ActiveDeskBoxDragRegistry.TryMatch(hints,out _,out _);
+            WidgetItem? hitItem = hasFileData &&
+                CurrentContent is FileWidgetContentAdapter
+                    ? FindNativeDropDataContext<WidgetItem>(
+                        screenX,                        screenY)
+                    : null;
+            ItemDropBehavior hitBehavior = hitItem is { } hit
+                ? ItemDropBehaviorPolicy.Resolve(hit)
+                : ItemDropBehavior.None;
+            WidgetItem? nativeTarget = hitBehavior is
+                ItemDropBehavior.FolderImport or
+                ItemDropBehavior.StackImport
+                    ? hitItem
+                    : null;
+            _nativeFileDropItemTarget = nativeTarget;
+            _nativeFileDropLaunchTarget =
+                hitBehavior == ItemDropBehavior.Launch && !isSelfDrag
+                    ? hitItem
+                    : null;
+            file.ObserveNativeDragPointer(
+                screenX,                screenY,                hasFileData,                pathHints,                nativeTarget,                _nativeFileDropLaunchTarget);
+        });
+    }
+
+    private IReadOnlyList<string> GetNativeFileDropPathHints()
+    {
+        return _nativeFileDropTargets.Values
+            .Where(target => target.HasFileData)
+            .SelectMany(target => target.DragPathHints)
+            .Where(path => !string.IsNullOrWhiteSpace(path))
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .ToArray();
+    }
+
+    private void RunOnNativeFileDropUiThread(Action<FileWidgetContentAdapter> action)
+    {
+        void Invoke()
+        {
+            if (!IsClosing && CurrentContent is FileWidgetContentAdapter file)
+            {
+                action(file);
+            }
+        }
+
+        if (DispatcherQueue.HasThreadAccess)
+        {
+            Invoke();
+        }
+        else
+        {
+            DispatcherQueue.TryEnqueue(Invoke);
+        }
+    }
+
+    private void RunOnUi(Action action)
+    {
+        if (DispatcherQueue.HasThreadAccess)
+        {
+            action();
+        }
+        else
+        {
+            DispatcherQueue.TryEnqueue(() =>
+            {
+                if (!IsClosing)
+                {
+                    action();
+                }
+            });
+        }
+    }
+
+    // Explorer-style drags may never surface as XAML drag events, so the
+    // group-title tab dwell is also driven from the native DragOver stream.
+    // Member-detach drags carry no file formats; hasFileData excludes them
+    // on this path where the payload cannot be inspected.
+    private void ObserveNativeGroupTabDragHover(
+        int screenX,        int screenY,        bool hasFileData,        long pointerGeneration)
+    {
+        RunOnUi(() =>
+        {
+            if (pointerGeneration != 0 &&
+                pointerGeneration != System.Threading.Interlocked.Read(
+                    ref _nativeFileDropPointerGeneration))
+            {
+                // Native OLE callbacks run off the UI thread; a queued
+                // DragOver can be older than the newest pointer location.
+                return;
+            }
+            // File-bearing drags freeze the group tab strip wherever they are
+            // in the window: entering the strip already frozen skips the
+            // one-frame widen TabView reserves on its DragEnter.
+            WidgetShellControl.SetGroupTabFileDragActive(hasFileData);
+            if (!hasFileData)
+            {
+                WidgetShellControl.CancelGroupTabDragHover();
+                return;
+            }
+            if (RootGrid.XamlRoot is null)
+            {
+                return;
+            }
+
+            var clientPoint = new Win32Helper.POINT
+            {
+                X = screenX,
+                Y = screenY
+            };
+            if (!Win32Helper.ScreenToClient(HWnd,ref clientPoint))
+            {
+                return;
+            }
+
+            double scale = RootGrid.XamlRoot.RasterizationScale;
+            if (scale <= 0)
+            {
+                scale = 1;
+            }
+
+            var point = new Windows.Foundation.Point(
+                clientPoint.X / scale,                clientPoint.Y / scale);
+            TabViewItem? tab = null;
+            if (WidgetShellControl.IsPointOverGroupTitleBar(RootGrid,point))
+            {
+                tab = VisualTreeHelper
+                    .FindElementsInHostCoordinates(point,RootGrid)
+                    .OfType<TabViewItem>()
+                    .FirstOrDefault();
+            }
+            WidgetShellControl.ObserveGroupTabDragHover(tab);
+        });
+    }
+
+    private void NativeFileDropTarget_DropEvent(
+        IReadOnlyList<string> paths,        int screenX,        int screenY,        bool containsTemporaryFiles,        bool copyWhenMapped)
+    {
+        System.Threading.Interlocked.Increment(
+            ref _nativeFileDropPointerGeneration);
+        if (_nativeDropIntentHandledForLegacyCallback)
+        {
+            // The richer callback below already owns this drop. Keep this
+            // legacy event subscribed for compatibility with existing native
+            // targets, but do not enqueue a duplicate filesystem operation.
+            _nativeDropIntentHandledForLegacyCallback = false;
+            return;
+        }
+
+        App.Log(
+            $"[DropDiagnostic] content id={_config.Id} stage=NativeIDropTargetDrop " +
+            $"count={paths.Count} temporary={containsTemporaryFiles} " +
+            $"copyWhenMapped={copyWhenMapped}");
+        // Native OLE commonly raises DragLeave immediately after Drop.  Latch
+        // the visible insertion line before the asynchronous import is queued,
+        // otherwise the leave cleanup clears it and the files fall back to the
+        // append position.
+        RunOnNativeFileDropUiThread(file =>
+            file.CaptureNativeDropInsertion(screenX,screenY));
+        ScheduleNativeFileDropFallback(
+            paths,            containsTemporaryFiles,            copyWhenMapped,            screenX,            screenY);
+        _nativeFileDropItemTarget = null;
+        _nativeFileDropLaunchTarget = null;
+        RunOnUi(() => WidgetShellControl.SetGroupTabFileDragActive(false));
+    }
+
+    /// <summary>
+    /// Runs synchronously inside the OLE Drop callback: when the pointer is on
+    /// an application-shortcut tile, the dropped files are opened with the
+    /// application the shortcut points at. A shortcut that cannot launch
+    /// consumes the gesture: the user asked to open the file with that
+    /// application, so the fallback is a notification, never the import that
+    /// would move the file. Only a drop that no shortcut owned (NotAttempted)
+    /// stays an ordinary import.
+    /// </summary>
+    private ShellDropLaunchResult HandleNativeLaunchDrop(
+        NativeDropLaunchRequest request)
+    {
+        if (CurrentContent is not FileWidgetContentAdapter ||
+            request.RightButtonDrag ||
+            _nativeFileDropLaunchTarget is not { Path.Length: > 0 } launchTarget ||
+            ActiveDeskBoxDragRegistry.TryMatch(
+                request.Paths,out _,out _))
+        {
+            // A DeskBox-originated drag never launches through the native
+            // path: the XAML completion path applies the internal-drag launch
+            // policy (icon hit-test, popover-member exclusion, self-file
+            // exclusion) and reports the outcome there.
+            return ShellDropLaunchResult.NotAttempted;
+        }
+
+        if (CurrentContent is FileWidgetContentAdapter launchSurface &&
+            launchSurface.WasLaunchConsumedRecently())
+        {
+            // Another entry point (legacy WM_DROPFILES, or the routed XAML drop)
+            // already resolved this release. Launching again would open the
+            // application a second time, so stand down and keep the refusal.
+            _nativeFileDropItemTarget = null;
+            _nativeFileDropLaunchTarget = null;
+            return ShellDropLaunchResult.AlreadyResolved;
+        }
+
+        bool launched = ShortcutFileLauncher.TryLaunchWithFiles(
+            launchTarget.Path,            request.Paths);
+        _nativeFileDropItemTarget = null;
+        _nativeFileDropLaunchTarget = null;
+        string applicationName = launchTarget.Name;
+        _lastXamlFileDropUtc = DateTimeOffset.UtcNow;
+        // Claim the gesture on this thread: the legacy WM_DROPFILES message for
+        // the same release can arrive before queued UI work would run, and it
+        // must not turn this outcome into an import.
+        MarkLaunchConsumedForCurrentContent();
+        RunOnNativeFileDropUiThread(file =>
+        {
+            file.ClearDragSessionVisualState();
+            if (!launched)
+            {
+                file.ShowShortcutLaunchRefusedFeedback(applicationName);
+            }
+        });
+        if (launched && request.ContainsTemporaryFiles)
+        {
+            // The launched application may read the materialized virtual files
+            // lazily, so the import path's synchronous VirtualDrops cleanup is
+            // deferred past a generous startup window instead.
+            IReadOnlyList<string> temporaryPaths = request.Paths;
+            _ = Task.Delay(TimeSpan.FromSeconds(20))
+                .ContinueWith(_ => CleanupNativeTemporaryDropFiles(temporaryPaths));
+        }
+        else if (request.ContainsTemporaryFiles)
+        {
+            CleanupNativeTemporaryDropFiles(request.Paths);
+        }
+
+        return launched
+            ? ShellDropLaunchResult.Launched(NativeDropEffectPolicy.Link,0)
+            : ShellDropLaunchResult.Failed(0);
+    }
+
+    private void MarkLaunchConsumedForCurrentContent()
+    {
+        if (CurrentContent is FileWidgetContentAdapter fileSurface)
+        {
+            fileSurface.MarkNativeLaunchConsumed();
+        }
+    }
+
+    private bool IsNativeDropOnSameVolume(IReadOnlyList<string> paths)
+    {
+        // Without a resolvable destination folder the glyph falls back to
+        // the same-volume default this path has always reported.
+        return CurrentContent is FileWidgetContentAdapter file &&
+            file.CurrentFolderPath is { Length: > 0 } folder &&
+            Helpers.FileDropIntentPolicy.AreAllOnSameVolume(paths,folder);
+    }
+
+    private bool IsNativeDropImportBusy()
+    {
+        return CurrentContent is FileWidgetContentAdapter { IsImportBusy: true };
+    }
+
+    private bool IsNativeFileDropPathUndisplayable(string path)
+    {
+        // The widget display filters describe the file surface's item list;
+        // quick capture and todo attachments keep every file they accept.
+        return CurrentContent is FileWidgetContentAdapter &&
+            FileService.IsFilteredFromWidgetDisplay(path);
+    }
+
+    private void NativeFileDropTarget_UndisplayableDropBlocked(int requestedCount)
+    {
+        RunOnNativeFileDropUiThread(file =>
+            file.NotifyNativeDropBlockedUndisplayable(requestedCount));
+    }
+
+    private void NativeFileDropTarget_DropIntentEvent(
+        NativeDropIntentEventArgs args)
+    {
+        System.Threading.Interlocked.Increment(
+            ref _nativeFileDropPointerGeneration);
+        _nativeDropIntentHandledForLegacyCallback = true;
+        bool followWindows = ShouldFollowWindowsNativeFileDrop();
+        // The forced intent must obey the same allowed-effect constraints the
+        // deferred re-resolution applies; otherwise Shift on a source that
+        // never announced Move would force a transfer that deletes originals.
+        uint allowedEffects = args.AllowedEffects;
+        bool sourceCanCopy =
+            (allowedEffects & NativeDropEffectPolicy.Copy) != 0;
+        bool sourceCanMove =
+            (allowedEffects & NativeDropEffectPolicy.Move) != 0;
+        FileDropIntent? forcedIntent = args.ShortcutRequested &&
+            !args.ContainsTemporaryFiles
+                ? FileDropIntent.Shortcut
+                : followWindows &&
+                  (args.KeyState & NativeDropEffectPolicy.ControlKeyState) != 0 &&
+                  sourceCanCopy
+                    ? FileDropIntent.Copy
+                    : followWindows &&
+                      (args.KeyState & NativeDropEffectPolicy.ShiftKeyState) != 0 &&
+                      sourceCanMove
+                        ? FileDropIntent.Move
+                        : null;
+        App.Log(
+            $"[DropDiagnostic] content id={_config.Id} stage=NativeDropIntent " +
+            $"count={args.Paths.Count} temporary={args.ContainsTemporaryFiles} " +
+            $"shortcut={args.ShortcutRequested} rightButton={args.RightButtonDrag} " +
+            $"effect={args.FeedbackEffect}");
+
+        if (ActiveDeskBoxDragRegistry.TryMatch(
+                args.Paths,                out string? selfDragWidget,                out _))
+        {
+            // This drop came from our own file surface: the routed/internal
+            // drag handling owns reorder, stack membership, launches and
+            // cross-widget transfer. The one thing the native side still
+            // carries is a same-window folder/stack tile drop, because WinUI
+            // does not deliver the routed Drop to item surfaces for a
+            // same-ListView drag (documented framework behavior).
+            if (_nativeFileDropItemTarget is null ||
+                !string.Equals(
+                    selfDragWidget,                    _config.Id,                    StringComparison.OrdinalIgnoreCase))
+            {
+                App.LogVerbose(
+                    $"[DropTarget] Native import skipped: DeskBox self-drag " +
+                    $"widget={selfDragWidget}");
+                _nativeFileDropItemTarget = null;
+                _nativeFileDropLaunchTarget = null;
+                return;
+            }
+        }
+
+        // Capture the insertion index synchronously on the UI thread before
+        // Explorer's native drag loop sends DragLeave and clears the preview.
+        RunOnNativeFileDropUiThread(file =>
+            file.CaptureNativeDropInsertion(args.ScreenX,args.ScreenY));
+
+        // A right-button drag is intentionally resolved after release. The
+        // native OLE callback cannot wait for a WinUI flyout without blocking
+        // Explorer's drag loop, so the target keeps the source untouched and
+        // lets DeskBox execute the selected operation asynchronously.
+        if (args.RightButtonDrag)
+        {
+            QueueNativeRightButtonDropChoice(args);
+        }
+        else
+        {
+            ScheduleNativeFileDropFallback(
+                args.Paths,                args.ContainsTemporaryFiles,                args.CopyRequested,                args.ScreenX,                args.ScreenY,                forcedIntent,                allowedEffects);
+        }
+
+        _nativeFileDropItemTarget = null;
+        _nativeFileDropLaunchTarget = null;
+    }
+
+    private enum NativeRightDropChoice
+    {
+        Cancel,
+        Copy,
+        Move,
+        Shortcut,
+        OpenWithApp
+    }
+
+    private void QueueNativeRightButtonDropChoice(
+        NativeDropIntentEventArgs args)
+    {
+        if (!DispatcherQueue.TryEnqueue(async () =>
+            {
+                WidgetItem? launchTarget = _nativeFileDropLaunchTarget;
+                NativeRightDropChoice choice =
+                    await ShowNativeRightButtonDropChoiceAsync(args,launchTarget);
+                if (choice == NativeRightDropChoice.Cancel)
+                {
+                    RunOnNativeFileDropUiThread(file =>
+                        file.ClearPendingNativeDropInsertion());
+                    if (args.ContainsTemporaryFiles)
+                    {
+                        CleanupNativeTemporaryDropFiles(args.Paths);
+                    }
+
+                    return;
+                }
+
+                if (choice == NativeRightDropChoice.OpenWithApp)
+                {
+                    ExecuteRightButtonLaunchChoice(args,launchTarget);
+                    return;
+                }
+
+                bool copyWhenMapped = choice != NativeRightDropChoice.Move;
+                ScheduleNativeFileDropFallback(
+                    args.Paths,                    args.ContainsTemporaryFiles,                    copyWhenMapped,                    args.ScreenX,                    args.ScreenY,                    choice == NativeRightDropChoice.Shortcut
+                        ? FileDropIntent.Shortcut
+                        : null,                    args.AllowedEffects);
+            }))
+        {
+            if (args.ContainsTemporaryFiles)
+            {
+                CleanupNativeTemporaryDropFiles(args.Paths);
+            }
+        }
+    }
+
+    /// <summary>
+    /// The user chose "open with" in the right-button menu, so the files are
+    /// opened with the shortcut's application. The real data object is already
+    /// released at this point, which no longer matters: the launch passes the
+    /// extracted paths as arguments instead of delegating a drop.
+    /// </summary>
+    private void ExecuteRightButtonLaunchChoice(
+        NativeDropIntentEventArgs args,        WidgetItem? launchTarget)
+    {
+        if (launchTarget is not { Path.Length: > 0 } shortcut || args.Paths.Count == 0)
+        {
+            CleanupIfTemporary(args);
+            return;
+        }
+
+        string applicationName = shortcut.Name;
+        MarkLaunchConsumedForCurrentContent();
+        if (ShortcutFileLauncher.TryLaunchWithFiles(shortcut.Path,args.Paths))
+        {
+            // A successful launch is silent: the application window is its own
+            // feedback.
+            if (args.ContainsTemporaryFiles)
+            {
+                IReadOnlyList<string> temporaryPaths = args.Paths;
+                _ = Task.Delay(TimeSpan.FromSeconds(20))
+                    .ContinueWith(_ => CleanupNativeTemporaryDropFiles(temporaryPaths));
+            }
+
+            return;
+        }
+
+        // The user asked for this specific application, so a failure is
+        // reported instead of falling back to the copy the menu would have done.
+        RunOnNativeFileDropUiThread(file =>
+            file.ShowShortcutLaunchRefusedFeedback(applicationName));
+        CleanupIfTemporary(args);
+    }
+
+    private void CleanupIfTemporary(NativeDropIntentEventArgs args)
+    {
+        RunOnNativeFileDropUiThread(file =>
+            file.ClearPendingNativeDropInsertion());
+        if (args.ContainsTemporaryFiles)
+        {
+            CleanupNativeTemporaryDropFiles(args.Paths);
+        }
+    }
+
+    private async Task<NativeRightDropChoice> ShowNativeRightButtonDropChoiceAsync(
+        NativeDropIntentEventArgs args,        WidgetItem? launchTarget)
+    {
+        // Quick Capture and Todo have their own import contracts; keep their
+        // native right-button drop deterministic instead of presenting file
+        // grid operations that those surfaces cannot honor.
+        if (CurrentContent is not FileWidgetContentAdapter ||
+            string.IsNullOrWhiteSpace(
+                App.Current.SettingsService.Settings.ManagedDropAction) ||
+            RootGrid.XamlRoot is null)
+        {
+            return NativeRightDropChoice.Copy;
+        }
+
+        var completion = new TaskCompletionSource<NativeRightDropChoice>(
+            TaskCreationOptions.RunContinuationsAsynchronously);
+        var menu = new MenuFlyout();
+        if (launchTarget is { Path.Length: > 0 } shortcut)
+        {
+            AddNativeRightChoice(
+                menu,                App.Current.LocalizationService.Format(
+                    "Widget.DropOnShortcutOpenWith",                    shortcut.Name),                NativeRightDropChoice.OpenWithApp,                completion);
+        }
+
+        AddNativeRightChoice(
+            menu,            App.Current.LocalizationService.T("Common.Copy"),            NativeRightDropChoice.Copy,            completion);
+        if (!string.IsNullOrWhiteSpace(
+                CurrentContent is FileWidgetContentAdapter file
+                    ? file.ViewModel.MappedFolderPath
+                    : null))
+        {
+            AddNativeRightChoice(
+                menu,                App.Current.LocalizationService.T("Common.Move"),                NativeRightDropChoice.Move,                completion);
+            if (!args.ContainsTemporaryFiles)
+            {
+                AddNativeRightChoice(
+                    menu,                    App.Current.LocalizationService.T("Widget.CreateShortcut"),                    NativeRightDropChoice.Shortcut,                    completion);
+            }
+        }
+
+        AddNativeRightChoice(
+            menu,            App.Current.LocalizationService.T("Common.Cancel"),            NativeRightDropChoice.Cancel,            completion);
+        menu.Closed += (_,_) =>
+            completion.TrySetResult(NativeRightDropChoice.Cancel);
+
+        try
+        {
+            menu.ShowAt(
+                RootGrid,                GetNativeDropMenuPoint(args.ScreenX,args.ScreenY));
+        }
+        catch (Exception ex)
+        {
+            App.Log($"[DropTarget] Right-button choice menu failed: {ex.Message}");
+            return NativeRightDropChoice.Copy;
+        }
+
+        return await completion.Task;
+    }
+
+    private static void AddNativeRightChoice(
+        MenuFlyout menu,        string text,        NativeRightDropChoice choice,        TaskCompletionSource<NativeRightDropChoice> completion)
+    {
+        var item = new MenuFlyoutItem { Text = text, Tag = choice };
+        item.Click += (_,_) =>
+        {
+            completion.TrySetResult(choice);
+            menu.Hide();
+        };
+        menu.Items.Add(item);
+    }
+
+    private Windows.Foundation.Point GetNativeDropMenuPoint(
+        int screenX,        int screenY)
+    {
+        var clientPoint = new Win32Helper.POINT { X = screenX, Y = screenY };
+        if (!Win32Helper.ScreenToClient(HWnd,ref clientPoint) ||
+            RootGrid.XamlRoot is null)
+        {
+            return new Windows.Foundation.Point(0,0);
+        }
+
+        double scale = RootGrid.XamlRoot.RasterizationScale;
+        return new Windows.Foundation.Point(
+            clientPoint.X / Math.Max(1,scale),            clientPoint.Y / Math.Max(1,scale));
+    }
+
+    private void ScheduleNativeFileDropFallback(
+        IReadOnlyList<string> paths,        bool containsTemporaryFiles,        bool copyWhenMapped,        int screenX,        int screenY,        FileDropIntent? forcedIntent = null,        uint? allowedEffects = null)
+    {
+        if (paths.Count == 0)
+        {
+            return;
+        }
+
+        string[] ownedPaths = paths.ToArray();
+        if (DateTimeOffset.UtcNow - _lastXamlFileDropUtc <
+            TimeSpan.FromMilliseconds(500))
+        {
+            // The routed WinUI path already committed this drop. Do not leave
+            // the native preview index armed for a later unrelated import.
+            RunOnNativeFileDropUiThread(file =>
+                file.ClearPendingNativeDropInsertion());
+            if (containsTemporaryFiles)
+            {
+                CleanupNativeTemporaryDropFiles(ownedPaths);
+            }
+
+            App.LogVerbose(
+                "[DropTarget] Native import skipped because WinUI handled the drop.");
+            return;
+        }
+
+        CancelPendingNativeFileDropFallback();
+        var cancellation = new CancellationTokenSource();
+        _pendingNativeFileDropCts = cancellation;
+        _ = CompleteNativeFileDropFallbackAsync(
+            ownedPaths,            containsTemporaryFiles,            copyWhenMapped,            screenX,            screenY,            forcedIntent,            allowedEffects,            cancellation);
+    }
+
+    private async Task CompleteNativeFileDropFallbackAsync(
+        IReadOnlyList<string> paths,        bool containsTemporaryFiles,        bool copyWhenMapped,        int screenX,        int screenY,        FileDropIntent? forcedIntent,        uint? allowedEffects,        CancellationTokenSource cancellation)
+    {
+        bool importOwnsTemporaryFiles = false;
+        try
+        {
+            await Task.Delay(120,cancellation.Token);
+            if (cancellation.IsCancellationRequested ||
+                !ReferenceEquals(_pendingNativeFileDropCts,cancellation) ||
+                DateTimeOffset.UtcNow - _lastXamlFileDropUtc <
+                TimeSpan.FromMilliseconds(500))
+            {
+                return;
+            }
+
+            QueueNativeFileDropImport(
+                paths,                containsTemporaryFiles,                copyWhenMapped,                screenX,                screenY,                forcedIntent,                allowedEffects);
+            importOwnsTemporaryFiles = true;
+        }
+        catch (OperationCanceledException)
+        {
+            // The routed WinUI Drop path completed first.
+        }
+        finally
+        {
+            if (ReferenceEquals(_pendingNativeFileDropCts,cancellation))
+            {
+                _pendingNativeFileDropCts = null;
+            }
+
+            if (containsTemporaryFiles && !importOwnsTemporaryFiles)
+            {
+                CleanupNativeTemporaryDropFiles(paths);
+            }
+
+            cancellation.Dispose();
+        }
+    }
+
+    private void CancelPendingNativeFileDropFallback()
+    {
+        CancellationTokenSource? cancellation = _pendingNativeFileDropCts;
+        _pendingNativeFileDropCts = null;
+        cancellation?.Cancel();
+    }
+
+    private void QueueNativeFileDropImport(
+        IReadOnlyList<string> paths,        bool containsTemporaryFiles,        bool? copyWhenMapped,        int? screenX = null,        int? screenY = null,        FileDropIntent? forcedIntent = null,        uint? allowedEffects = null)
+    {
+        if (paths.Count == 0)
+        {
+            return;
+        }
+
+        if (!DispatcherQueue.TryEnqueue(
+                () => _ = ImportNativeFileDropAsync(
+                    paths,                    containsTemporaryFiles,                    copyWhenMapped,                    screenX,                    screenY,                    forcedIntent,                    allowedEffects)))
+        {
+            if (containsTemporaryFiles)
+            {
+                CleanupNativeTemporaryDropFiles(paths);
+            }
+        }
+    }
+
+    private async Task ImportNativeFileDropAsync(
+        IReadOnlyList<string> paths,        bool containsTemporaryFiles,        bool? copyWhenMapped,        int? screenX,        int? screenY,        FileDropIntent? forcedIntent,        uint? allowedEffects)
+    {
+        try
+        {
+            if (IsClosing)
+            {
+                return;
+            }
+
+            switch (CurrentContent)
+            {
+                case FileWidgetContentAdapter file:
+                    file.SetHostWindowHandle(HWnd);
+                    await file.ImportNativeDroppedFilesAsync(
+                        paths,                        containsTemporaryFiles,                        copyWhenMapped,                        NormalizeNativeFileDropItemTarget(
+                            FindNativeDropDataContext<WidgetItem>(
+                                screenX,                                screenY)),                        forcedIntent,                        screenX,                        screenY,                        allowedEffects);
+                    break;
+
+                default:
+                    App.Log(
+                        $"[DropTarget] Ignored grouped native file drop " +
+                        $"id={_config.Id}; the active member does not " +
+                        "accept files.");
+                    break;
+            }
+        }
+        finally
+        {
+            if (containsTemporaryFiles)
+            {
+                CleanupNativeTemporaryDropFiles(paths);
+            }
+        }
+    }
+
+    private static IReadOnlyList<DroppedFilePath> CreateNativeDroppedFilePaths(
+        IReadOnlyList<string> paths,        bool forceManagedCopy)
+    {
+        return paths
+            .Where(path => !string.IsNullOrWhiteSpace(path))
+            .Select(Path.GetFullPath)
+            .Where(path => File.Exists(path) || Directory.Exists(path))
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .Select(path => new DroppedFilePath(
+                path,                Path.GetFileName(
+                    path.TrimEnd(
+                        Path.DirectorySeparatorChar,                        Path.AltDirectorySeparatorChar)),                forceManagedCopy))
+            .ToArray();
+    }
+
+    private T? FindNativeDropDataContext<T>(
+        int? screenX,        int? screenY)
+        where T : class
+    {
+        if (screenX is null || screenY is null || RootGrid.XamlRoot is null)
+        {
+            return null;
+        }
+
+        var clientPoint = new Win32Helper.POINT
+        {
+            X = screenX.Value,
+            Y = screenY.Value
+        };
+        if (!Win32Helper.ScreenToClient(HWnd,ref clientPoint))
+        {
+            return null;
+        }
+
+        double scale = RootGrid.XamlRoot.RasterizationScale;
+        if (scale <= 0)
+        {
+            scale = 1;
+        }
+
+        var point = new Windows.Foundation.Point(
+            clientPoint.X / scale,            clientPoint.Y / scale);
+        return VisualTreeHelper.FindElementsInHostCoordinates(point,RootGrid)
+            .OfType<FrameworkElement>()
+            .Select(element => element.DataContext)
+            .OfType<T>()
+            .FirstOrDefault();
+    }
+
+    private static WidgetItem? NormalizeNativeFileDropItemTarget(
+        WidgetItem? item)
+    {
+        return item is { } candidate &&
+            ItemDropBehaviorPolicy.Resolve(candidate) is
+                ItemDropBehavior.FolderImport or
+                ItemDropBehavior.StackImport
+            ? item
+            : null;
+    }
+
+    private static void CleanupNativeTemporaryDropFiles(
+        IReadOnlyList<string> paths)
+    {
+        string temporaryRoot = Path.GetFullPath(Path.Combine(
+            Path.GetTempPath(),            "DeskBox",            "VirtualDrops"))
+            .TrimEnd(Path.DirectorySeparatorChar,Path.AltDirectorySeparatorChar) +
+            Path.DirectorySeparatorChar;
+
+        foreach (string directory in paths
+                     .Select(Path.GetDirectoryName)
+                     .Where(directory => !string.IsNullOrWhiteSpace(directory))
+                     .Select(directory => Path.GetFullPath(directory!))
+                     .Distinct(StringComparer.OrdinalIgnoreCase))
+        {
+            string normalizedDirectory = directory
+                .TrimEnd(Path.DirectorySeparatorChar,Path.AltDirectorySeparatorChar) +
+                Path.DirectorySeparatorChar;
+            if (!normalizedDirectory.StartsWith(
+                    temporaryRoot,                    StringComparison.OrdinalIgnoreCase))
+            {
+                continue;
+            }
+
+            try
+            {
+                if (Directory.Exists(directory))
+                {
+                    Directory.Delete(directory,recursive: true);
+                }
+            }
+            catch (Exception ex)
+            {
+                App.Log(
+                    $"[DropTarget] Failed to clean grouped virtual drop directory: {ex.Message}");
+            }
+        }
+    }
+}

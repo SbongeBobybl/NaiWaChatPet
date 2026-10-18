@@ -1,0 +1,28 @@
+{
+  "name": "embarrassed",
+  "emotion": "embarrassed",
+  "fps": 12,
+  "frameCount": 1,
+  "loop": true,
+  "priority": 22,
+  "mouthAnchor": {
+    "frame": 0,
+    "x": 180,
+    "y": 108
+  },
+  "transitionIn": "",
+  "transitionOut": "",
+  "canvas": {
+    "width": 420,
+    "height": 560
+  },
+  "groundY": 540,
+  "frames": [
+    {
+      "file": "0000.png",
+      "sha256": "44741b7f7f515b96ed4a7d2f6d90e6a6c0aca60dd3ccd5e07103a4da3d18805b"
+    }
+  ],
+  "reviewed": true,
+  "sourceSha256": "def67935676601238f09269df2dab79c278b5ab3cea64b7a292b7ebeb426a00e"
+}

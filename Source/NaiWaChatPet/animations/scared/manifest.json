@@ -1,0 +1,28 @@
+{
+  "name": "scared",
+  "emotion": "scared",
+  "fps": 12,
+  "frameCount": 1,
+  "loop": true,
+  "priority": 28,
+  "mouthAnchor": {
+    "frame": 0,
+    "x": 180,
+    "y": 108
+  },
+  "transitionIn": "",
+  "transitionOut": "",
+  "canvas": {
+    "width": 420,
+    "height": 560
+  },
+  "groundY": 540,
+  "frames": [
+    {
+      "file": "0000.png",
+      "sha256": "6a2165532934f64fd4a7f8a4801bb9c35e25c99172374ea7765f77045ebc0525"
+    }
+  ],
+  "reviewed": true,
+  "sourceSha256": "59365f98902ff53fe503a888f384dbb930bc01ae8c1276722ddb1f9721cc3a17"
+}

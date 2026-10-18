@@ -1,0 +1,28 @@
+{
+  "name": "dizzy",
+  "emotion": "dizzy",
+  "fps": 12,
+  "frameCount": 1,
+  "loop": true,
+  "priority": 22,
+  "mouthAnchor": {
+    "frame": 0,
+    "x": 180,
+    "y": 108
+  },
+  "transitionIn": "",
+  "transitionOut": "",
+  "canvas": {
+    "width": 420,
+    "height": 560
+  },
+  "groundY": 540,
+  "frames": [
+    {
+      "file": "0000.png",
+      "sha256": "47fd1e41c83c619130ffa3418757819d5138537261d3ed784c62c19956436b06"
+    }
+  ],
+  "reviewed": true,
+  "sourceSha256": "cf91c8f0675bb83bfd370846ed7b89fb7be3e73423516653e3a0b67808ddb712"
+}

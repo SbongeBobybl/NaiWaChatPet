@@ -1,0 +1,28 @@
+{
+  "name": "crying",
+  "emotion": "crying",
+  "fps": 12,
+  "frameCount": 1,
+  "loop": true,
+  "priority": 28,
+  "mouthAnchor": {
+    "frame": 0,
+    "x": 180,
+    "y": 108
+  },
+  "transitionIn": "",
+  "transitionOut": "",
+  "canvas": {
+    "width": 420,
+    "height": 560
+  },
+  "groundY": 540,
+  "frames": [
+    {
+      "file": "0000.png",
+      "sha256": "9f78ebb7122edf0bc5e2908a711f4efd17a759d725fa0d8fc856cd8bd67e8f52"
+    }
+  ],
+  "reviewed": true,
+  "sourceSha256": "b9185ca419923cc5edd9b3c6fc23d2128c16410a10065bf3381af9f03590eeb4"
+}

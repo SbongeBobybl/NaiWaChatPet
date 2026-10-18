@@ -1,0 +1,11 @@
+#!/bin/sh
+# Enforce single-account commits: reject tool/co-author attribution trailers.
+# Matches line-anchored trailers only, so prose may still discuss them.
+# Bypass intentionally with `git commit --no-verify` when a real human
+# co-author is wanted.
+msg_file="$1"
+if grep -nEi '^\s*(co-authored-by|generated[ -]with|generated-by)\s*[: ]' "$msg_file" >/dev/null; then
+    echo "commit-msg: forbidden attribution trailer (Co-Authored-By / Generated with)." >&2
+    echo "This repository requires single-account commits. Remove the trailer and retry." >&2
+    exit 1
+fi

@@ -1,0 +1,28 @@
+{
+  "name": "ponder",
+  "emotion": "ponder",
+  "fps": 12,
+  "frameCount": 1,
+  "loop": true,
+  "priority": 16,
+  "mouthAnchor": {
+    "frame": 0,
+    "x": 180,
+    "y": 108
+  },
+  "transitionIn": "",
+  "transitionOut": "",
+  "canvas": {
+    "width": 420,
+    "height": 560
+  },
+  "groundY": 540,
+  "frames": [
+    {
+      "file": "0000.png",
+      "sha256": "02ea8d80fe422bfa53e56d797dd287912083ab5449e9d9e5ff61168ded5d3f1d"
+    }
+  ],
+  "reviewed": true,
+  "sourceSha256": "fe12885a93ed0d87af0c7023695a9872bf474c6bf9eacd292f998683ebf10acb"
+}

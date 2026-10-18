@@ -1,0 +1,363 @@
+using Microsoft.Windows.AppLifecycle;
+using Microsoft.Windows.AppNotifications;
+using Microsoft.Windows.AppNotifications.Builder;
+
+namespace DeskBox.Services;
+
+public sealed record NativeAppNotificationAction(
+    string Text,    IReadOnlyDictionary<string, string> Arguments,    string? InputId = null,    bool IsContextMenu = false);
+
+public sealed record NativeAppNotificationComboBoxItem(
+    string Id,    string Text);
+
+public sealed record NativeAppNotificationComboBox(
+    string Id,    string Title,    string SelectedItemId,    IReadOnlyList<NativeAppNotificationComboBoxItem> Items);
+
+public enum NativeAppNotificationActivationSource
+{
+    Unknown = 0,
+    NotificationInvokedEvent = 1,
+    CurrentAppInstance = 2
+}
+
+public sealed record NativeAppNotificationActivation(
+    string Arguments,    IReadOnlyDictionary<string, string> UserInput,    NativeAppNotificationActivationSource Source =
+        NativeAppNotificationActivationSource.Unknown,    DateTimeOffset CapturedAtUtc = default,    int SourceProcessId = 0,    string? EnvelopeId = null);
+
+public sealed record NativeAppNotificationOptions(
+    string? Tag = null,    string? Group = null,    AppNotificationScenario? Scenario = null);
+
+public sealed record NativeAppNotificationSnapshot(
+    uint Id,    string Tag,    string Group,    string Payload);
+
+public sealed class NativeAppNotificationService : IDisposable
+{
+    // Registration failures are retried at most once per window; every failed
+    // attempt costs a COM activation and a log line, and TryShow is called for
+    // each reminder/notification burst.
+    private static readonly TimeSpan s_registerRetryInterval = TimeSpan.FromMinutes(5);
+
+    private readonly Action<NativeAppNotificationActivation> _activated;
+    private bool _isRegistered;
+    private bool _isDisposed;
+    private DateTimeOffset _lastRegisterAttemptAtUtc = DateTimeOffset.MinValue;
+
+    public NativeAppNotificationService(Action<NativeAppNotificationActivation> activated)
+    {
+        _activated = activated;
+    }
+
+    public bool IsRegistered => _isRegistered;
+
+    internal NativeAppNotificationActivation? ReadCurrentActivation()
+    {
+        if (!_isRegistered || _isDisposed)
+            return null;
+        try
+        {
+            var activatedArgs = AppInstance.GetCurrent().GetActivatedEventArgs();
+            if (activatedArgs.Kind == ExtendedActivationKind.AppNotification &&
+                activatedArgs.Data is AppNotificationActivatedEventArgs notificationArgs)
+            {
+                var userInput = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+                foreach (var input in notificationArgs.UserInput)
+                {
+                    if (!string.IsNullOrWhiteSpace(input.Key))
+                    {
+                        userInput[input.Key] = input.Value ?? string.Empty;
+                    }
+                }
+
+                return new NativeAppNotificationActivation(
+                    notificationArgs.Argument,                    userInput,                    NativeAppNotificationActivationSource.CurrentAppInstance,                    DateTimeOffset.UtcNow,                    Environment.ProcessId);
+            }
+        }
+        catch (Exception ex)
+        {
+            App.Log($"[Notification] Failed to read native notification activation args: {ex.Message}");
+        }
+
+        return null;
+    }
+
+
+
+    public bool Register(bool forceRetry = false)
+    {
+        if (_isDisposed)
+        {
+            return false;
+        }
+
+        if (_isRegistered)
+        {
+            return true;
+        }
+
+        if (!forceRetry &&
+            DateTimeOffset.UtcNow - _lastRegisterAttemptAtUtc < s_registerRetryInterval)
+        {
+            return false;
+        }
+
+        _lastRegisterAttemptAtUtc = DateTimeOffset.UtcNow;
+        try
+        {
+            // The SDK's Register is a no-op in unsupported processes (for
+            // example elevated ones). Do not mistake that for a usable native
+            // deserializer and read activation arguments with no wait handle.
+            if (!AppNotificationManager.IsSupported())
+            {
+                App.Log("[Notification] Native app notifications are not supported in this process");
+                return false;
+            }
+            AppNotificationManager.Default.NotificationInvoked += OnNotificationInvoked;
+            AppNotificationManager.Default.Register();
+            _isRegistered = true;
+            App.Log("[Notification] Native app notification registered");
+            return true;
+        }
+        catch (Exception ex)
+        {
+            try { AppNotificationManager.Default.NotificationInvoked -= OnNotificationInvoked; }
+            catch { /* A failed platform activation must leave ordinary startup available. */ }
+            App.Log(
+                $"[Notification] Native app notification registration failed: {ex}");
+            LogNotificationPlatformEnvironment();
+            return false;
+        }
+    }
+
+    /// <summary>
+    /// Records the state of the OS notification platform next to a registration
+    /// failure. REGDB_E_CLASSNOTREG (0x80040154) almost always means the
+    /// Windows Push Notifications service or the user-level toast switch was
+    /// disabled system-wide, which no app-side retry can recover from.
+    /// </summary>
+    private static void LogNotificationPlatformEnvironment()
+    {
+        try
+        {
+            object? wpnStart = Microsoft.Win32.Registry.GetValue(
+                @"HKEY_LOCAL_MACHINE\SYSTEM\CurrentControlSet\Services\WpnService",                "Start",                null);
+            object? toastEnabled = Microsoft.Win32.Registry.GetValue(
+                @"HKEY_CURRENT_USER\Software\Microsoft\Windows\CurrentVersion\PushNotifications",                "ToastEnabled",                null);
+            App.Log(
+                "[Notification] Platform probe: " +
+                $"WpnService.Start={wpnStart?.ToString() ?? "unknown"} " +
+                $"(4=disabled) ToastEnabled={toastEnabled?.ToString() ?? "unknown"} " +
+                $"os={Environment.OSVersion.Version}");
+        }
+        catch (Exception probeEx)
+        {
+            App.Log($"[Notification] Platform probe failed: {probeEx.Message}");
+        }
+    }
+
+    public bool TryShow(
+        string title,        string message,        IReadOnlyDictionary<string, string>? arguments = null,        IReadOnlyList<NativeAppNotificationAction>? actions = null,        IReadOnlyList<NativeAppNotificationComboBox>? comboBoxes = null,        NativeAppNotificationOptions? options = null)
+    {
+        if (_isDisposed || !Register())
+        {
+            return false;
+        }
+
+        try
+        {
+            var builder = new AppNotificationBuilder()
+                .AddText(title)
+                .AddText(message);
+
+            if (!string.IsNullOrWhiteSpace(options?.Group))
+            {
+                builder.SetGroup(options.Group);
+            }
+
+            if (!string.IsNullOrWhiteSpace(options?.Tag))
+            {
+                builder.SetTag(options.Tag);
+            }
+
+            if (options?.Scenario is { } scenario)
+            {
+                builder.SetScenario(scenario);
+            }
+
+            if (arguments is not null)
+            {
+                foreach (var (key, value) in arguments)
+                {
+                    builder.AddArgument(key,value);
+                }
+            }
+
+            if (comboBoxes is not null)
+            {
+                foreach (var comboBox in comboBoxes)
+                {
+                    if (string.IsNullOrWhiteSpace(comboBox.Id) ||
+                        comboBox.Items.Count == 0)
+                    {
+                        continue;
+                    }
+
+                    var appComboBox = new AppNotificationComboBox(comboBox.Id);
+                    if (!string.IsNullOrWhiteSpace(comboBox.Title))
+                    {
+                        appComboBox.SetTitle(comboBox.Title);
+                    }
+
+                    foreach (var item in comboBox.Items)
+                    {
+                        if (!string.IsNullOrWhiteSpace(item.Id) &&
+                            !string.IsNullOrWhiteSpace(item.Text))
+                        {
+                            appComboBox.AddItem(item.Id,item.Text);
+                        }
+                    }
+
+                    if (!string.IsNullOrWhiteSpace(comboBox.SelectedItemId))
+                    {
+                        appComboBox.SetSelectedItem(comboBox.SelectedItemId);
+                    }
+
+                    builder.AddComboBox(appComboBox);
+                }
+            }
+
+            if (actions is not null)
+            {
+                foreach (var action in actions)
+                {
+                    if (string.IsNullOrWhiteSpace(action.Text))
+                    {
+                        continue;
+                    }
+
+                    var button = new AppNotificationButton(action.Text);
+                    foreach (var (key, value) in action.Arguments)
+                    {
+                        button.AddArgument(key,value);
+                    }
+
+                    if (!string.IsNullOrWhiteSpace(action.InputId))
+                    {
+                        button.SetInputId(action.InputId);
+                    }
+
+                    if (action.IsContextMenu)
+                    {
+                        button.SetContextMenuPlacement();
+                    }
+
+                    builder.AddButton(button);
+                }
+            }
+
+            AppNotificationManager.Default.Show(builder.BuildNotification());
+            return true;
+        }
+        catch (Exception ex)
+        {
+            App.Log($"[Notification] Native app notification show failed: {ex}");
+            return false;
+        }
+    }
+
+    public async Task<IReadOnlyList<NativeAppNotificationSnapshot>> GetAllAsync()
+    {
+        if (_isDisposed)
+        {
+            throw new ObjectDisposedException(nameof(NativeAppNotificationService));
+        }
+
+        IList<AppNotification> notifications =
+            await AppNotificationManager.Default.GetAllAsync();
+        return notifications
+            .Select(notification => new NativeAppNotificationSnapshot(
+                notification.Id,                notification.Tag ?? string.Empty,                notification.Group ?? string.Empty,                notification.Payload ?? string.Empty))
+            .ToArray();
+    }
+
+    public async Task RemoveByTagAndGroupAsync(string tag,string group)
+    {
+        if (_isDisposed)
+        {
+            throw new ObjectDisposedException(nameof(NativeAppNotificationService));
+        }
+
+        if (string.IsNullOrWhiteSpace(tag))
+        {
+            throw new ArgumentException("A notification tag is required.",nameof(tag));
+        }
+
+        if (string.IsNullOrWhiteSpace(group))
+        {
+            throw new ArgumentException("A notification group is required.",nameof(group));
+        }
+
+        // Removal targets notifications this process previously showed; an
+        // unregistered process owns none, and calling the platform API anyway
+        // would surface a COM failure the caller cannot act on.
+        if (!_isRegistered)
+        {
+            return;
+        }
+
+        await AppNotificationManager.Default.RemoveByTagAndGroupAsync(tag,group);
+        App.Log($"[Notification] Removed native app notification tag={tag} group={group}");
+    }
+
+    public bool Unregister()
+    {
+        if (_isDisposed)
+        {
+            return false;
+        }
+
+        if (!_isRegistered)
+        {
+            return true;
+        }
+
+        try
+        {
+            AppNotificationManager.Default.NotificationInvoked -= OnNotificationInvoked;
+            AppNotificationManager.Default.Unregister();
+            _isRegistered = false;
+            App.Log("[Notification] Native app notification unregistered");
+            return true;
+        }
+        catch (Exception ex)
+        {
+            App.Log($"[Notification] Native app notification unregister failed: {ex}");
+            return false;
+        }
+    }
+
+    public void Dispose()
+    {
+        if (_isDisposed)
+        {
+            return;
+        }
+
+        _ = Unregister();
+        _isDisposed = true;
+    }
+
+    private void OnNotificationInvoked(AppNotificationManager sender,AppNotificationActivatedEventArgs args)
+    {
+        var userInput = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+        foreach (var input in args.UserInput)
+        {
+            if (!string.IsNullOrWhiteSpace(input.Key))
+            {
+                userInput[input.Key] = input.Value ?? string.Empty;
+            }
+        }
+
+        _activated(new NativeAppNotificationActivation(
+            args.Argument,            userInput,            NativeAppNotificationActivationSource.NotificationInvokedEvent,            DateTimeOffset.UtcNow,            Environment.ProcessId));
+    }
+}

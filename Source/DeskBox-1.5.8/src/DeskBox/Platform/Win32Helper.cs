@@ -1,0 +1,2824 @@
+using System.ComponentModel;
+using System.Diagnostics;
+using System.IO;
+using System.Runtime.InteropServices;
+using System.Text;
+using DeskBox.Helpers;
+using DeskBox.Models;
+using DeskBox.Services;
+using Microsoft.Win32.SafeHandles;
+
+namespace DeskBox.Platform;
+
+/// <summary>
+/// P/Invoke helpers for Win32 window management and shell operations.
+/// </summary>
+/// <remarks>
+/// Known inversion recorded at migration time: OpenFileOrChooseApp calls into
+/// the Helpers-layer ExplorerShellLaunch* machinery, so this file keeps a
+/// DeskBox.Helpers using until the launch subsystem moves as its own slice.
+/// </remarks>
+public static partial class Win32Helper
+{
+    // ── shell: fullscreen-app detection (display topology gate, spec 5.6) ──
+
+    public const int QueryUserNotificationStateBusy = 2;
+    public const int QueryUserNotificationStateRunningD3dFullScreen = 3;
+    public const int QueryUserNotificationStatePresentationMode = 4;
+
+    [DllImport("shell32.dll", SetLastError = false)]
+    private static extern int SHQueryUserNotificationState(out int state);
+
+    /// <summary>
+    /// True while a fullscreen-exclusive app (game) or presentation mode owns
+    /// the screen. Used to park topology restores (resolution flips from
+    /// fullscreen games must not reshuffle widgets, spec S13).
+    /// </summary>
+    public static bool IsFullscreenAppActive()
+    {
+        try
+        {
+            return SHQueryUserNotificationState(out int state) == 0 &&
+                   state is QueryUserNotificationStateBusy or
+                       QueryUserNotificationStateRunningD3dFullScreen or
+                       QueryUserNotificationStatePresentationMode;
+        }
+        catch (Exception ex) when (
+            ex is DllNotFoundException or EntryPointNotFoundException)
+        {
+            return false;
+        }
+    }
+
+    private const uint FileShareRead = 0x00000001;
+    private const uint FileShareWrite = 0x00000002;
+    private const uint FileShareDelete = 0x00000004;
+    private const uint OpenExisting = 3;
+    private const uint FileFlagBackupSemantics = 0x02000000;
+
+    [DllImport("dcomp.dll")]
+    private static extern int DCompositionBoostCompositorClock(
+        [MarshalAs(UnmanagedType.Bool)] bool enable);
+
+    [DllImport("winmm.dll", EntryPoint = "timeBeginPeriod")]
+    private static extern uint TimeBeginPeriod(uint periodMilliseconds);
+
+    [DllImport("winmm.dll", EntryPoint = "timeEndPeriod")]
+    private static extern uint TimeEndPeriod(uint periodMilliseconds);
+
+    /// <summary>
+    /// Requests the DirectComposition compositor clock to run at its active
+    /// cadence while a short interactive animation is in progress. This is a
+    /// best-effort Windows capability and safely falls back on older systems.
+    /// </summary>
+    public static bool TrySetCompositorClockBoost(bool enabled)
+    {
+        try
+        {
+            return DCompositionBoostCompositorClock(enabled) >= 0;
+        }
+        catch (Exception ex) when (
+            ex is DllNotFoundException or EntryPointNotFoundException or BadImageFormatException)
+        {
+            return false;
+        }
+    }
+
+    /// <summary>
+    /// Requests 1ms timer resolution only while an interactive Win10 animation
+    /// owns a lease. Calls are reference-counted by the coordinator.
+    /// </summary>
+    public static bool TrySetHighResolutionTimer(bool enabled)
+    {
+        try
+        {
+            return (enabled ? TimeBeginPeriod(1) : TimeEndPeriod(1)) == 0;
+        }
+        catch (Exception ex) when (
+            ex is DllNotFoundException or EntryPointNotFoundException or BadImageFormatException)
+        {
+            return false;
+        }
+    }
+
+    [DllImport("kernel32.dll", CharSet = CharSet.Unicode, SetLastError = true)]
+    private static extern SafeFileHandle CreateFileForFinalPath(
+        string lpFileName,        uint dwDesiredAccess,        uint dwShareMode,        IntPtr lpSecurityAttributes,        uint dwCreationDisposition,        uint dwFlagsAndAttributes,        IntPtr hTemplateFile);
+
+    [DllImport("kernel32.dll", CharSet = CharSet.Unicode, SetLastError = true)]
+    private static extern uint GetFinalPathNameByHandle(
+        SafeFileHandle hFile,        StringBuilder lpszFilePath,        uint cchFilePath,        uint dwFlags);
+
+    /// <summary>
+    /// Resolves a file or directory through the Windows object manager. This
+    /// collapses junctions, symbolic links, SUBST drives and UNC aliases into
+    /// the same final volume identity where Windows can open the path.
+    /// </summary>
+    public static bool TryGetFinalPath(string path,out string finalPath)
+    {
+        finalPath = string.Empty;
+        if (string.IsNullOrWhiteSpace(path))
+        {
+            return false;
+        }
+
+        try
+        {
+            using SafeFileHandle handle = CreateFileForFinalPath(
+                path,                dwDesiredAccess: 0,                FileShareRead | FileShareWrite | FileShareDelete,                IntPtr.Zero,                OpenExisting,                FileFlagBackupSemantics,                IntPtr.Zero);
+            if (handle.IsInvalid)
+            {
+                return false;
+            }
+
+            var buffer = new StringBuilder(512);
+            uint length = GetFinalPathNameByHandle(handle,buffer,(uint)buffer.Capacity,0);
+            if (length == 0)
+            {
+                return false;
+            }
+
+            if (length >= buffer.Capacity)
+            {
+                buffer = new StringBuilder((int)length + 1);
+                length = GetFinalPathNameByHandle(handle,buffer,(uint)buffer.Capacity,0);
+            }
+
+            if (length == 0)
+            {
+                return false;
+            }
+
+            finalPath = NormalizeFinalPath(buffer.ToString());
+            return !string.IsNullOrWhiteSpace(finalPath);
+        }
+        catch (Exception ex) when (
+            ex is IOException or UnauthorizedAccessException or
+            DllNotFoundException or EntryPointNotFoundException)
+        {
+            return false;
+        }
+    }
+
+    private static string NormalizeFinalPath(string path)
+    {
+        if (path.StartsWith(@"\\?\UNC\",StringComparison.OrdinalIgnoreCase))
+        {
+            return @"\" + path[7..];
+        }
+
+        return path.StartsWith(@"\\?\",StringComparison.Ordinal)
+            ? path[4..]
+            : path;
+    }
+
+    // ────────────────────────────────────────────────────────────────
+    //  SetWindowPos – Z-order manipulation
+    // ────────────────────────────────────────────────────────────────
+
+    /// <summary>Places the window at the bottom of the Z order.</summary>
+    public static readonly IntPtr HWND_TOP = IntPtr.Zero;
+    public static readonly IntPtr HWND_BOTTOM = 1;
+    public static readonly IntPtr HWND_TOPMOST = -1;
+    public static readonly IntPtr HWND_NOTOPMOST = -2;
+
+    public const uint SWP_NOMOVE = 0x0002;
+    public const uint SWP_NOSIZE = 0x0001;
+    public const uint SWP_NOZORDER = 0x0004;
+    public const uint SWP_NOREDRAW = 0x0008;
+    public const uint SWP_NOACTIVATE = 0x0010;
+    public const uint SWP_SHOWWINDOW = 0x0040;
+    public const uint SWP_NOCOPYBITS = 0x0100;
+    public const uint SWP_FRAMECHANGED = 0x0020;
+    public const uint SWP_NOOWNERZORDER = 0x0200;
+    public const uint SWP_DEFERERASE = 0x2000;
+    public const int SW_HIDE = 0;
+    public const int SW_SHOWNORMAL = 1;
+    public const int SW_SHOWNOACTIVATE = 4;
+
+    [LibraryImport("user32.dll", SetLastError = true)]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    public static partial bool SetWindowPos(
+        IntPtr hWnd,        IntPtr hWndInsertAfter,        int X,        int Y,        int cx,        int cy,        uint uFlags);
+
+    // ── DeferWindowPos: atomic multi-window position batch ──────────
+    // Moving N windows through one HDWP transaction commits all positions
+    // to DWM in a single batch, so grouped widgets slide in lockstep
+    // instead of staggering per-window SetWindowPos calls.
+
+    [LibraryImport("user32.dll", SetLastError = true)]
+    public static partial IntPtr BeginDeferWindowPos(int nNumWindows);
+
+    [LibraryImport("user32.dll", SetLastError = true)]
+    public static partial IntPtr DeferWindowPos(
+        IntPtr hWinPosInfo,        IntPtr hWnd,        IntPtr hWndInsertAfter,        int x,        int y,        int cx,        int cy,        uint uFlags);
+
+    [LibraryImport("user32.dll", SetLastError = true)]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    public static partial bool EndDeferWindowPos(IntPtr hWinPosInfo);
+
+    [LibraryImport("user32.dll", SetLastError = true)]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    public static partial bool ShowWindow(IntPtr hWnd,int nCmdShow);
+
+    public delegate bool EnumWindowsProc(IntPtr hWnd,IntPtr lParam);
+
+    [LibraryImport("user32.dll")]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    public static partial bool EnumWindows(EnumWindowsProc lpEnumFunc,IntPtr lParam);
+
+    [LibraryImport("user32.dll")]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    public static partial bool EnumChildWindows(
+        IntPtr hWndParent,        EnumWindowsProc lpEnumFunc,        IntPtr lParam);
+
+    [LibraryImport("user32.dll")]
+    public static partial uint GetWindowThreadProcessId(IntPtr hWnd,out uint processId);
+
+    [DllImport("user32.dll", CharSet = CharSet.Unicode)]
+    public static extern int GetWindowText(IntPtr hWnd,StringBuilder lpString,int nMaxCount);
+
+    [DllImport("user32.dll", CharSet = CharSet.Unicode)]
+    public static extern int GetClassName(IntPtr hWnd,StringBuilder lpClassName,int nMaxCount);
+
+    [LibraryImport("user32.dll")]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    public static partial bool IsWindowVisible(IntPtr hWnd);
+
+    [LibraryImport("user32.dll")]
+    public static partial IntPtr GetWindow(IntPtr hWnd,uint uCmd);
+
+    public const uint GW_HWNDFIRST = 0;
+    public const uint GW_HWNDLAST = 1;
+    public const uint GW_HWNDNEXT = 2;
+    public const uint GW_HWNDPREV = 3;
+    public const uint GW_OWNER = 4;
+
+    [LibraryImport("user32.dll")]
+    public static partial IntPtr GetForegroundWindow();
+
+    [LibraryImport("user32.dll")]
+    public static partial IntPtr GetShellWindow();
+
+    [LibraryImport("user32.dll", SetLastError = true)]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    public static partial bool AllowSetForegroundWindow(uint processId);
+
+    [LibraryImport("user32.dll")]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    public static partial bool SetForegroundWindow(IntPtr hWnd);
+
+    [LibraryImport("user32.dll")]
+    public static partial IntPtr WindowFromPoint(POINT point);
+
+    [LibraryImport("user32.dll")]
+    public static partial IntPtr GetParent(IntPtr hWnd);
+
+    [LibraryImport("user32.dll")]
+    public static partial IntPtr GetAncestor(IntPtr hWnd,uint gaFlags);
+
+    [LibraryImport("user32.dll")]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    public static partial bool IsWindow(IntPtr hWnd);
+
+    [LibraryImport("user32.dll", EntryPoint = "FindWindowExW", SetLastError = true, StringMarshalling = StringMarshalling.Utf16)]
+    public static partial IntPtr FindWindowEx(IntPtr hWndParent,IntPtr hWndChildAfter,string? lpszClass,string? lpszWindow);
+
+    [LibraryImport("user32.dll", EntryPoint = "SendMessageTimeoutW", SetLastError = true)]
+    public static partial IntPtr SendMessageTimeout(
+        IntPtr hWnd,        uint message,        UIntPtr wParam,        IntPtr lParam,        uint flags,        uint timeout,        out UIntPtr result);
+
+    [LibraryImport("user32.dll", EntryPoint = "RegisterWindowMessageW", SetLastError = true, StringMarshalling = StringMarshalling.Utf16)]
+    public static partial uint RegisterWindowMessage(string lpString);
+
+    private const uint MB_OK = 0x00000000;
+    private const uint MB_YESNO = 0x00000004;
+    private const uint MB_ICONERROR = 0x00000010;
+    private const uint MB_ICONWARNING = 0x00000030;
+    private const int IDYES = 6;
+
+    [LibraryImport("user32.dll", EntryPoint = "MessageBoxW", SetLastError = true, StringMarshalling = StringMarshalling.Utf16)]
+    private static partial int MessageBox(IntPtr hWnd,string lpText,string lpCaption,uint uType);
+
+    /// <summary>
+    /// Shows the shell-style warning that changing a file extension may make
+    /// the file unusable. Returns true only when the user explicitly picks
+    /// Yes; No, closing the dialog, and Escape all decline the rename.
+    /// </summary>
+    public static bool ConfirmExtensionChange(IntPtr ownerHandle,string message,string caption)
+    {
+        int choice = MessageBox(ownerHandle,message,caption,MB_YESNO | MB_ICONWARNING);
+        return choice == IDYES;
+    }
+
+    /// <summary>
+    /// Shows an ownerless error dialog for fatal startup failures where no
+    /// XAML surface exists yet. Must stay native: the failure path runs
+    /// before/after arbitrary XAML teardown, so only user32 is dependable.
+    /// </summary>
+    public static void ShowFatalError(string message,string caption)
+    {
+        MessageBox(IntPtr.Zero,message,caption,MB_OK | MB_ICONERROR);
+    }
+
+    public const uint GA_ROOT = 2;
+    public const uint GA_ROOTOWNER = 3;
+    public const uint SMTO_NORMAL = 0x0000;
+
+    // ────────────────────────────────────────────────────────────────
+    //  Extended window styles
+    // ────────────────────────────────────────────────────────────────
+
+    public const int GWL_EXSTYLE = -20;
+    public const int WS_EX_TOPMOST = 0x00000008;
+    public const int WS_EX_TOOLWINDOW = 0x00000080;
+    public const int WS_EX_TRANSPARENT = 0x00000020;
+    public const int WS_EX_NOACTIVATE = 0x08000000;
+    public const int WS_EX_LAYERED = 0x00080000;
+    public const uint LWA_ALPHA = 0x00000002;
+
+    public const int GWL_STYLE = -16;
+    public const int GWLP_HWNDPARENT = -8;
+    public const int WS_CHILD = 0x40000000;
+    public const int WS_VISIBLE = 0x10000000;
+    public const int WS_POPUP = unchecked((int)0x80000000);
+    public const int WS_BORDER = 0x00800000;
+    public const int WS_CAPTION = 0x00C00000;
+    public const int WS_DLGFRAME = 0x00400000;
+    public const int WS_THICKFRAME = 0x00040000;
+
+    [LibraryImport("user32.dll", EntryPoint = "GetWindowLongW")]
+    public static partial int GetWindowLong(IntPtr hWnd,int nIndex);
+
+    [LibraryImport("user32.dll", EntryPoint = "SetWindowLongW")]
+    public static partial int SetWindowLong(IntPtr hWnd,int nIndex,int dwNewLong);
+
+    [LibraryImport("user32.dll", EntryPoint = "GetWindowLongPtrW", SetLastError = true)]
+    public static partial IntPtr GetWindowLongPtr(IntPtr hWnd,int nIndex);
+
+    [LibraryImport("user32.dll", EntryPoint = "SetWindowLongPtrW", SetLastError = true)]
+    public static partial IntPtr SetWindowLongPtr(IntPtr hWnd,int nIndex,IntPtr dwNewLong);
+
+    [LibraryImport("kernel32.dll")]
+    public static partial void SetLastError(uint dwErrCode);
+
+    [LibraryImport("user32.dll", SetLastError = true)]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    public static partial bool SetLayeredWindowAttributes(
+        IntPtr hwnd,        uint crKey,        byte bAlpha,        uint dwFlags);
+
+    public const uint MSGFLT_ALLOW = 1;
+    public const uint WM_DROPFILES = 0x0233;
+    public const uint WM_COPYDATA = 0x004A;
+    public const uint WM_COPYGLOBALDATA = 0x0049;
+
+    [LibraryImport("user32.dll", SetLastError = true)]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    public static partial bool ChangeWindowMessageFilterEx(
+        IntPtr hWnd,        uint message,        uint action,        IntPtr changeFilterStruct);
+
+    [LibraryImport("shell32.dll")]
+    public static partial void DragAcceptFiles(IntPtr hWnd,[MarshalAs(UnmanagedType.Bool)] bool accept);
+
+    [DllImport("shell32.dll", EntryPoint = "DragQueryFileW", CharSet = CharSet.Unicode)]
+    public static extern uint DragQueryFile(IntPtr hDrop,uint fileIndex,StringBuilder? fileName,uint bufferSize);
+
+    [LibraryImport("shell32.dll")]
+    public static partial void DragFinish(IntPtr hDrop);
+
+    public static void AllowShellDragDropMessages(IntPtr hWnd)
+    {
+        AllowWindowMessage(hWnd,WM_DROPFILES,"WM_DROPFILES");
+        AllowWindowMessage(hWnd,WM_COPYDATA,"WM_COPYDATA");
+        AllowWindowMessage(hWnd,WM_COPYGLOBALDATA,"WM_COPYGLOBALDATA");
+        DragAcceptFiles(hWnd,true);
+    }
+
+    public static IReadOnlyList<string> GetDroppedFilePaths(IntPtr hDrop)
+    {
+        var paths = new List<string>();
+        try
+        {
+            uint count = DragQueryFile(hDrop,0xFFFFFFFF,null,0);
+            for (uint index = 0; index < count; index++)
+            {
+                uint length = DragQueryFile(hDrop,index,null,0);
+                if (length == 0)
+                {
+                    continue;
+                }
+
+                var builder = new StringBuilder((int)length + 1);
+                uint copied = DragQueryFile(hDrop,index,builder,(uint)builder.Capacity);
+                if (copied > 0)
+                {
+                    paths.Add(builder.ToString());
+                }
+            }
+        }
+        finally
+        {
+            DragFinish(hDrop);
+        }
+
+        return paths;
+    }
+
+    private static void AllowWindowMessage(IntPtr hWnd,uint message,string name)
+    {
+        bool changed = ChangeWindowMessageFilterEx(hWnd,message,MSGFLT_ALLOW,IntPtr.Zero);
+        int error = Marshal.GetLastWin32Error();
+        global::DeskBox.App.LogVerbose(
+            $"[WindowMessageFilter] hwnd=0x{hWnd.ToInt64():X} message={name} changed={changed} lastError={error}");
+    }
+
+    [StructLayout(LayoutKind.Sequential)]
+    public struct AccentPolicy
+    {
+        public int AccentState;
+        public int AccentFlags;
+        public uint GradientColor;
+        public int AnimationId;
+    }
+
+    [StructLayout(LayoutKind.Sequential)]
+    public struct WindowCompositionAttributeData
+    {
+        public int Attribute;
+        public IntPtr Data;
+        public int SizeOfData;
+    }
+
+    [LibraryImport("user32.dll", SetLastError = true)]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    public static partial bool SetWindowCompositionAttribute(
+        IntPtr hwnd,        ref WindowCompositionAttributeData data);
+
+    [LibraryImport("user32.dll")]
+    public static partial short GetKeyState(int nVirtKey);
+
+    [LibraryImport("user32.dll")]
+    internal static partial short GetAsyncKeyState(int vKey);
+
+    public static bool IsKeyDown(int virtualKey)
+    {
+        return (GetAsyncKeyState(virtualKey) & 0x8000) != 0;
+    }
+
+    /// <summary>
+    /// Synthesizes key-up events for all modifier keys (Alt, Ctrl, Shift,
+    /// including left/right variants).  This clears any "stuck" modifier
+    /// state that can occur in RDP sessions where the modifier key-up
+    /// event is lost or delayed by the remote desktop protocol.
+    ///
+    /// When RegisterHotKey registers e.g. Alt+D, a stuck Alt state causes
+    /// every subsequent D press to be intercepted as Alt+D, making the D
+    /// key appear dead.  Calling this right after the hotkey fires
+    /// prevents that.
+    /// </summary>
+    public static void ReleaseAllModifiers()
+    {
+        // VK codes for all modifier keys
+        int[] modifierVks =
+        [
+            0x10,            0x11,            0x12,            0xA0,            0xA1,            0xA2,            0xA3,            0xA4,            0xA5        ];
+
+        foreach (int vk in modifierVks)
+        {
+            if (IsKeyDown(vk))
+            {
+                _ = TrySendKeyboardEvent((ushort)vk,KEYEVENTF_KEYUP,UIntPtr.Zero,out _);
+            }
+        }
+    }
+
+    private const uint KEYEVENTF_KEYUP = 0x0002;
+
+    /// <summary>
+    /// Sends a short, tagged keyboard press and verifies that both input
+    /// records reached the Win32 input queue. The tag lets a low-level hook
+    /// ignore its own synthetic events.
+    /// </summary>
+    public static unsafe bool TrySendTaggedKeyPress(
+        ushort virtualKey,        IntPtr extraInfo,        out int errorCode)
+    {
+        var tag = new UIntPtr(unchecked((ulong)extraInfo.ToInt64()));
+        INPUT* inputs = stackalloc INPUT[2];
+        inputs[0] = CreateKeyboardInput(virtualKey,0,tag);
+        inputs[1] = CreateKeyboardInput(virtualKey,KEYEVENTF_KEYUP,tag);
+
+        uint sent = SendInput(2,inputs,sizeof(INPUT));
+        if (sent == 2)
+        {
+            errorCode = 0;
+            return true;
+        }
+
+        errorCode = Marshal.GetLastWin32Error();
+        if (errorCode == 0)
+        {
+            errorCode = 31; // ERROR_GEN_FAILURE
+        }
+
+        // If only the key-down record was accepted, make a best-effort key-up
+        // call so a partial SendInput result cannot leave the synthetic key
+        // logically pressed.
+        if (sent == 1)
+        {
+            INPUT release = CreateKeyboardInput(virtualKey,KEYEVENTF_KEYUP,tag);
+            _ = SendInput(1,&release,sizeof(INPUT));
+        }
+
+        return false;
+    }
+
+    /// <summary>
+    /// Tick count of the last user input anywhere in this session
+    /// (GetLastInputInfo). Returns false when the platform call fails.
+    /// </summary>
+    public static bool TryGetLastInputTickCount(out uint lastInputTickCount)
+    {
+        var info = new LASTINPUTINFO { Size = (uint)Marshal.SizeOf<LASTINPUTINFO>() };
+        if (GetLastInputInfo(ref info))
+        {
+            lastInputTickCount = info.Time;
+            return true;
+        }
+
+        lastInputTickCount = 0;
+        return false;
+    }
+
+    /// <summary>
+    /// Id of a named clipboard format (RegisterClipboardFormat). Zero means
+    /// the platform call failed and the format must be treated as
+    /// unavailable, never as a valid format id.
+    /// </summary>
+    public static ushort GetRegisteredClipboardFormat(string format) =>
+        (ushort)RegisterClipboardFormatW(format);
+
+    [LibraryImport("user32.dll", EntryPoint = "RegisterClipboardFormatW",
+        StringMarshalling = StringMarshalling.Utf16)]
+    private static partial uint RegisterClipboardFormatW(string format);
+
+    /// <summary>
+    /// Initializes COM with OLE support on the current thread (drag-and-drop
+    /// requires the OLE apartment, not plain CoInitialize). Returns the
+    /// HRESULT; S_FALSE means already initialized.
+    /// </summary>
+    public static int InitializeOleOnCurrentThread() => OleInitialize(0);
+
+    [LibraryImport("ole32.dll")]
+    private static partial int OleInitialize(nint reserved);
+
+    /// <summary>
+    /// Allocates movable global memory and copies <paramref name="data"/> into
+    /// it, ready to be handed to IDataObject::SetData as a TYMED_HGLOBAL
+    /// medium with ownership transfer. Returns false when allocation fails.
+    /// </summary>
+    public static unsafe bool TryCreateGlobalMemory(
+        ReadOnlySpan<byte> data,        out nint globalMemory)
+    {
+        globalMemory = GlobalAlloc(GmemMoveable | GmemZeroInit,(nuint)Math.Max(1,data.Length));
+        if (globalMemory == 0)
+        {
+            return false;
+        }
+
+        byte* locked = (byte*)GlobalLock(globalMemory);
+        if (locked == null)
+        {
+            GlobalFree(globalMemory);
+            globalMemory = 0;
+            return false;
+        }
+
+        try
+        {
+            data.CopyTo(new Span<byte>(locked,data.Length));
+        }
+        finally
+        {
+            _ = GlobalUnlock(globalMemory);
+        }
+
+        return true;
+    }
+
+    /// <summary>
+    /// Releases a STGMEDIUM obtained from IDataObject::GetData; ownership of
+    /// the contained medium transfers back to OLE.
+    /// </summary>
+    internal static unsafe void ReleaseStorageMedium(
+        ref Helpers.NativeStorageMedium medium)
+    {
+        fixed (Helpers.NativeStorageMedium* pointer = &medium)
+        {
+            ReleaseStgMedium(pointer);
+        }
+    }
+
+    [LibraryImport("ole32.dll")]
+    private static unsafe partial void ReleaseStgMedium(void* medium);
+
+    private const uint GmemMoveable = 0x0002;
+    private const uint GmemZeroInit = 0x0040;
+
+    [LibraryImport("kernel32.dll", SetLastError = true)]
+    private static partial nint GlobalAlloc(uint flags,nuint bytes);
+
+    [LibraryImport("kernel32.dll", SetLastError = true)]
+    private static partial nint GlobalLock(nint memory);
+
+    [LibraryImport("kernel32.dll", SetLastError = true)]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    private static partial bool GlobalUnlock(nint memory);
+
+    [LibraryImport("kernel32.dll", SetLastError = true)]
+    private static partial nint GlobalFree(nint memory);
+
+    /// <summary>
+    /// Sends a tagged +1/-1 pixel mouse move pair whose net movement is zero.
+    /// A low-level mouse hook can recognize the ExtraInfo tag and treat the
+    /// delivered callback as a liveness echo.
+    /// </summary>
+    public static unsafe bool TrySendTaggedMouseMoveNudge(IntPtr extraInfo,out int errorCode)
+    {
+        var tag = new UIntPtr(unchecked((ulong)extraInfo.ToInt64()));
+        INPUT* inputs = stackalloc INPUT[2];
+        inputs[0] = CreateMouseMoveInput(1,0,tag);
+        inputs[1] = CreateMouseMoveInput(-1,0,tag);
+
+        uint sent = SendInput(2,inputs,sizeof(INPUT));
+        if (sent == 2)
+        {
+            errorCode = 0;
+            return true;
+        }
+
+        errorCode = Marshal.GetLastWin32Error();
+        if (errorCode == 0)
+        {
+            errorCode = 31; // ERROR_GEN_FAILURE
+        }
+
+        return false;
+    }
+
+    private static INPUT CreateMouseMoveInput(int dx,int dy,UIntPtr extraInfo)
+    {
+        return new INPUT
+        {
+            Type = 0, // INPUT_MOUSE
+            Data = new INPUTUNION
+            {
+                Mouse = new MOUSEINPUT
+                {
+                    X = dx,
+                    Y = dy,
+                    MouseData = 0,
+                    Flags = 0x0001, // MOUSEEVENTF_MOVE
+                    Time = 0,
+                    ExtraInfo = extraInfo
+                }
+            }
+        };
+    }
+
+    private static unsafe bool TrySendKeyboardEvent(
+        ushort virtualKey,        uint flags,        UIntPtr extraInfo,        out int errorCode)
+    {
+        INPUT input = CreateKeyboardInput(virtualKey,flags,extraInfo);
+        uint sent = SendInput(1,&input,sizeof(INPUT));
+        if (sent == 1)
+        {
+            errorCode = 0;
+            return true;
+        }
+
+        errorCode = Marshal.GetLastWin32Error();
+        if (errorCode == 0)
+        {
+            errorCode = 31; // ERROR_GEN_FAILURE
+        }
+
+        return false;
+    }
+
+    private static INPUT CreateKeyboardInput(
+        ushort virtualKey,        uint flags,        UIntPtr extraInfo)
+    {
+        return new INPUT
+        {
+            Type = 1, // INPUT_KEYBOARD
+            Data = new INPUTUNION
+            {
+                Keyboard = new KEYBDINPUT
+                {
+                    VirtualKey = virtualKey,
+                    ScanCode = 0,
+                    Flags = flags,
+                    Time = 0,
+                    ExtraInfo = extraInfo
+                }
+            }
+        };
+    }
+
+    /// <summary>
+    /// Returns true if any mouse button was pressed since this thread last
+    /// queried that button. Uses the low bit of GetAsyncKeyState, which resets
+    /// per calling thread on every query — call periodically from one thread
+    /// to detect click edges between polls.
+    /// </summary>
+    public static bool HasMouseButtonPressSinceLastQuery()
+    {
+        return HasAsyncKeyPressSinceLastQuery(0x01) ||
+               HasAsyncKeyPressSinceLastQuery(0x02) ||
+               HasAsyncKeyPressSinceLastQuery(0x04) ||
+               HasAsyncKeyPressSinceLastQuery(0x05) ||
+               HasAsyncKeyPressSinceLastQuery(0x06);
+    }
+
+    /// <summary>
+    /// Returns true while any mouse button is physically held down. Uses the
+    /// high bit of GetAsyncKeyState — the global physical state, which stays
+    /// accurate regardless of which process received the click (unlike the
+    /// low "since last query" bit). Sample this periodically and watch for an
+    /// up→down transition to reliably detect clicks delivered to foreign windows.
+    /// </summary>
+    public static bool IsAnyMouseButtonDown()
+    {
+        return IsKeyDown(0x01) ||
+               IsKeyDown(0x02) ||
+               IsKeyDown(0x04) ||
+               IsKeyDown(0x05) ||
+               IsKeyDown(0x06);
+    }
+
+    private static bool HasAsyncKeyPressSinceLastQuery(int virtualKey)
+    {
+        return (GetAsyncKeyState(virtualKey) & 0x0001) != 0;
+    }
+
+    // ────────────────────────────────────────────────────────────────
+    //  Shell operations
+    // ────────────────────────────────────────────────────────────────
+
+    public const int WH_KEYBOARD_LL = 13;
+    public const int WH_MOUSE_LL = 14;
+    public const int WM_KEYDOWN = 0x0100;
+    public const int WM_KEYUP = 0x0101;
+    public const int WM_SYSKEYDOWN = 0x0104;
+    public const int WM_SYSKEYUP = 0x0105;
+    public const uint LLKHF_INJECTED = 0x00000010;
+    public const uint WM_QUIT = 0x0012;
+    public const uint PM_NOREMOVE = 0x0000;
+    public const int WM_MOUSEACTIVATE = 0x0021;
+    public const int WM_LBUTTONDOWN = 0x0201;
+    public const int WM_MOUSEWHEEL = 0x020A;
+    public const int WM_RBUTTONDOWN = 0x0204;
+    public const int WM_MBUTTONDOWN = 0x0207;
+    public const int WM_XBUTTONDOWN = 0x020B;
+
+    // Window sizing / hit-test messages and codes (borderless window drag + resize).
+    public const int WM_GETMINMAXINFO = 0x0024;
+    public const int WM_NCDESTROY = 0x0082;
+    public const int WM_NCHITTEST = 0x0084;
+    public const int WM_NCLBUTTONDBLCLK = 0x00A3;
+    public const int WM_EXITSIZEMOVE = 0x0232;
+    public const int MA_ACTIVATE = 1;
+    public const int MA_NOACTIVATE = 3;
+
+    public const int HTCLIENT = 1;
+    public const int HTCAPTION = 2;
+    public const int HTLEFT = 10;
+    public const int HTRIGHT = 11;
+    public const int HTTOP = 12;
+    public const int HTTOPLEFT = 13;
+    public const int HTTOPRIGHT = 14;
+    public const int HTBOTTOM = 15;
+    public const int HTBOTTOMLEFT = 16;
+    public const int HTBOTTOMRIGHT = 17;
+
+    public const int SM_CXSIZEFRAME = 32;
+    public const int SM_CYSIZEFRAME = 33;
+
+    // Virtual desktop bounding box (physical pixels) for the panorama
+    // background mapping.
+    public const int SM_XVIRTUALSCREEN = 76;
+    public const int SM_YVIRTUALSCREEN = 77;
+    public const int SM_CXVIRTUALSCREEN = 78;
+    public const int SM_CYVIRTUALSCREEN = 79;
+    public const int SM_REMOTESESSION = 0x1000;
+
+    [LibraryImport("user32.dll", SetLastError = true)]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    public static partial bool ScreenToClient(IntPtr hWnd,ref POINT point);
+
+    [LibraryImport("user32.dll")]
+    public static partial int GetSystemMetrics(int nIndex);
+
+    [LibraryImport("user32.dll")]
+    public static partial uint GetDoubleClickTime();
+
+    public delegate IntPtr LowLevelKeyboardProc(int nCode,IntPtr wParam,IntPtr lParam);
+    public delegate IntPtr LowLevelMouseProc(int nCode,IntPtr wParam,IntPtr lParam);
+
+    [StructLayout(LayoutKind.Sequential)]
+    public struct KBDLLHOOKSTRUCT
+    {
+        public uint vkCode;
+        public uint scanCode;
+        public uint flags;
+        public uint time;
+        public IntPtr dwExtraInfo;
+    }
+
+    [StructLayout(LayoutKind.Sequential)]
+    private struct INPUT
+    {
+        public uint Type;
+        public INPUTUNION Data;
+    }
+
+    [StructLayout(LayoutKind.Explicit)]
+    private struct INPUTUNION
+    {
+        [FieldOffset(0)]
+        public MOUSEINPUT Mouse;
+
+        [FieldOffset(0)]
+        public KEYBDINPUT Keyboard;
+
+        [FieldOffset(0)]
+        public HARDWAREINPUT Hardware;
+    }
+
+    [StructLayout(LayoutKind.Sequential)]
+    private struct MOUSEINPUT
+    {
+        public int X;
+        public int Y;
+        public uint MouseData;
+        public uint Flags;
+        public uint Time;
+        public UIntPtr ExtraInfo;
+    }
+
+    [StructLayout(LayoutKind.Sequential)]
+    private struct KEYBDINPUT
+    {
+        public ushort VirtualKey;
+        public ushort ScanCode;
+        public uint Flags;
+        public uint Time;
+        public UIntPtr ExtraInfo;
+    }
+
+    [StructLayout(LayoutKind.Sequential)]
+    private struct HARDWAREINPUT
+    {
+        public uint Message;
+        public ushort ParameterLow;
+        public ushort ParameterHigh;
+    }
+
+    [LibraryImport("user32.dll", SetLastError = true)]
+    private static unsafe partial uint SendInput(
+        uint inputCount,        INPUT* inputs,        int inputSize);
+
+    [StructLayout(LayoutKind.Sequential)]
+    private struct LASTINPUTINFO
+    {
+        public uint Size;
+        public uint Time;
+    }
+
+    [LibraryImport("user32.dll", SetLastError = true)]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    private static partial bool GetLastInputInfo(ref LASTINPUTINFO plii);
+
+    // Power setting notifications (display on/off etc.) delivered as
+    // WM_POWERBROADCAST/PBT_POWERSETTINGCHANGE to a window.
+    public const uint PbtPowerSettingChange = 0x8013;
+    public const uint DeviceNotifyWindowHandle = 0;
+
+    /// <summary>GUID_CONSOLE_DISPLAY_STATE — console display on/off/dimmed.</summary>
+    public static readonly Guid ConsoleDisplayStatePowerSetting =
+        new("6FE69556-704A-47A0-8F24-C28D936FDA47");
+
+    [StructLayout(LayoutKind.Sequential)]
+    public struct PowerBroadcastSetting
+    {
+        public Guid PowerSetting;
+        public uint DataLength;
+        public byte Data;
+    }
+
+    [LibraryImport("user32.dll", SetLastError = true, EntryPoint = "RegisterPowerSettingNotification")]
+    public static partial IntPtr RegisterPowerSettingNotification(
+        IntPtr hWnd,        ref Guid powerSettingGuid,        uint flags);
+
+    [LibraryImport("user32.dll", SetLastError = true, EntryPoint = "UnregisterPowerSettingNotification")]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    public static partial bool UnregisterPowerSettingNotification(IntPtr handle);
+
+    // System-wide visual effects (HKCU-scoped per-user parameters). Read-only:
+    // writes go through the OS settings surfaces — under an MSIX package the
+    // copy-on-write HKCU virtualization would swallow SPIF_UPDATEINIFILE's
+    // profile write and silently revert after the next sign-in.
+    private const uint SpiGetDropShadow = 0x1024;
+
+    // The GET actions pass a pointer to the receiving buffer in pvParam.
+    [LibraryImport("user32.dll", SetLastError = true, EntryPoint = "SystemParametersInfoW")]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    private static partial bool SystemParametersInfo(
+        uint uiAction,        uint uiParam,        IntPtr pvParam,        uint fWinIni);
+
+    /// <summary>Reads the system-wide "show shadows under windows" effect.</summary>
+    public static bool TryGetWindowDropShadowEnabled(out bool enabled)
+    {
+        enabled = false;
+        try
+        {
+            unsafe
+            {
+                int value = 0;
+                if (!SystemParametersInfo(SpiGetDropShadow,0,(IntPtr)(&value),0))
+                {
+                    return false;
+                }
+
+                enabled = value != 0;
+            }
+
+            return true;
+        }
+        catch
+        {
+            return false;
+        }
+    }
+
+    /// <summary>
+    /// Reads Windows' "Transparency effects" personalization switch — the
+    /// setting Mica/Acrylic materials degrade without. The registry value is
+    /// the source of truth across every supported build; a missing value
+    /// means the OS default (on).
+    /// </summary>
+    public static bool TryGetSystemTransparencyEffectsEnabled(out bool enabled)
+    {
+        enabled = true;
+        try
+        {
+            using Microsoft.Win32.RegistryKey? personalize =
+                Microsoft.Win32.Registry.CurrentUser.OpenSubKey(
+                    @"Software\Microsoft\Windows\CurrentVersion\Themes\Personalize");
+            if (personalize?.GetValue("EnableTransparency") is int value)
+            {
+                enabled = value != 0;
+            }
+
+            return true;
+        }
+        catch
+        {
+            return false;
+        }
+    }
+
+    [StructLayout(LayoutKind.Sequential)]
+    public struct MSG
+    {
+        public IntPtr hwnd;
+        public uint message;
+        public UIntPtr wParam;
+        public IntPtr lParam;
+        public uint time;
+        public POINT pt;
+        public uint lPrivate;
+    }
+
+    [StructLayout(LayoutKind.Sequential)]
+    public struct MSLLHOOKSTRUCT
+    {
+        public POINT pt;
+        public uint mouseData;
+        public uint flags;
+        public uint time;
+        public IntPtr dwExtraInfo;
+    }
+
+    [LibraryImport("user32.dll", SetLastError = true, EntryPoint = "SetWindowsHookExW")]
+    public static partial IntPtr SetWindowsHookEx(
+        int idHook,        LowLevelKeyboardProc lpfn,        IntPtr hmod,        uint dwThreadId);
+
+    [LibraryImport("user32.dll", SetLastError = true, EntryPoint = "SetWindowsHookExW")]
+    public static partial IntPtr SetWindowsMouseHookEx(
+        int idHook,        LowLevelMouseProc lpfn,        IntPtr hmod,        uint dwThreadId);
+
+    [LibraryImport("user32.dll", SetLastError = true)]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    public static partial bool UnhookWindowsHookEx(IntPtr hhk);
+
+    [LibraryImport("user32.dll")]
+    public static partial IntPtr CallNextHookEx(
+        IntPtr hhk,        int nCode,        IntPtr wParam,        IntPtr lParam);
+
+    [LibraryImport("user32.dll", EntryPoint = "GetMessageW")]
+    public static partial int GetMessage(
+        out MSG lpMsg,        IntPtr hWnd,        uint wMsgFilterMin,        uint wMsgFilterMax);
+
+    [LibraryImport("user32.dll")]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    public static partial bool TranslateMessage(in MSG lpMsg);
+
+    [LibraryImport("user32.dll", EntryPoint = "DispatchMessageW")]
+    public static partial IntPtr DispatchMessage(in MSG lpMsg);
+
+    [LibraryImport("user32.dll", EntryPoint = "PeekMessageW")]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    public static partial bool PeekMessage(
+        out MSG lpMsg,        IntPtr hWnd,        uint wMsgFilterMin,        uint wMsgFilterMax,        uint wRemoveMsg);
+
+    [LibraryImport("user32.dll", SetLastError = true, EntryPoint = "PostThreadMessageW")]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    public static partial bool PostThreadMessage(
+        uint idThread,        uint message,        UIntPtr wParam,        IntPtr lParam);
+
+    [LibraryImport("user32.dll", SetLastError = true, EntryPoint = "PostMessageW")]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    public static partial bool PostMessage(
+        IntPtr hWnd,        uint message,        UIntPtr wParam,        IntPtr lParam);
+
+    [LibraryImport("kernel32.dll")]
+    public static partial uint GetCurrentThreadId();
+
+    [LibraryImport("kernel32.dll", EntryPoint = "GetModuleHandleW", StringMarshalling = StringMarshalling.Utf16)]
+    public static partial IntPtr GetModuleHandle(string? lpModuleName);
+
+    [LibraryImport("shell32.dll", EntryPoint = "ShellExecuteW", StringMarshalling = StringMarshalling.Utf16)]
+    public static partial IntPtr ShellExecute(
+        IntPtr hwnd,        string lpOperation,        string lpFile,        string? lpParameters,        string? lpDirectory,        int nShowCmd);
+
+    [DllImport("shell32.dll", CharSet = CharSet.Unicode)]
+    private static extern int SHOpenWithDialog(IntPtr hwndParent,ref OpenAsInfo openAsInfo);
+
+    private const uint AssocfNone = 0;
+    private const uint AssocstrCommand = 1;
+    private const uint AssocstrProgId = 20; // ASSOCSTR_PROGID
+    private const uint HResultEPointer = 0x80004003;
+
+    [LibraryImport("shlwapi.dll", EntryPoint = "AssocQueryStringW", StringMarshalling = StringMarshalling.Utf16)]
+    private static partial uint AssocQueryString(
+        uint flags,        uint assocStr,        string assoc,        string? extra,        [Out] char[] outcome,        ref uint cchOut);
+
+    /// <summary>
+    /// Whether the shell resolves a default open handler for this path.
+    /// URIs dispatch by protocol and directories through Explorer itself, so
+    /// both count as associated. Unassociated files must not go through any
+    /// Shell dispatch: every dispatch path answers its own Open With picker
+    /// with a silent success, hiding a user dismissal as a launch.
+    /// </summary>
+    internal static bool HasShellOpenAssociation(string path)
+    {
+        if (Uri.TryCreate(path,UriKind.Absolute,out Uri? uri) && !uri.IsFile)
+        {
+            return true;
+        }
+
+        if (Directory.Exists(path))
+        {
+            return true;
+        }
+
+        // Shortcuts are dispatched by the Shell itself: the lnkfile class has
+        // no shell\open\command string, so the association query below always
+        // reports "no association" for .lnk and every shortcut would be sent
+        // to the Open With picker instead of launching (measured 2026-09-14).
+        if (string.Equals(
+                Path.GetExtension(path),                ".lnk",                StringComparison.OrdinalIgnoreCase))
+        {
+            return true;
+        }
+
+        string extension = Path.GetExtension(path);
+        if (string.IsNullOrEmpty(extension))
+        {
+            return false;
+        }
+
+        // The classic command query resolves the effective association —
+        // UserChoice included — but only reports handlers expressed as a
+        // literal shell\open\command line.
+        if (TryQueryOpenCommand(extension))
+        {
+            return true;
+        }
+
+        // Packaged (AppX) defaults register shell\open\command with only a
+        // DelegateExecute CLSID and no command line. Resolving the EFFECTIVE
+        // ProgId is UserChoice-aware and fails outright when nothing is
+        // associated, so a resolved ProgId already proves a default exists —
+        // a recommended-handler list would only prove capability. The verb
+        // check on that ProgId then covers DelegateExecute-only defaults.
+        if (TryQueryEffectiveProgId(extension,out string effectiveProgId) &&
+            ProgIdHasOpenVerb(effectiveProgId))
+        {
+            return true;
+        }
+
+        // A UserChoice whose hash no longer validates poisons both queries
+        // above, while Explorer still opens the file through the extension's
+        // class-default ProgId.
+        return ClassDefaultHasOpenVerb(extension);
+    }
+
+    /// <summary>
+    /// Whether the association string (extension or ProgId) resolves a real
+    /// shell\open\command line. Windows answers S_OK with the generic
+    /// OpenWith.exe launcher for unknown extensions; that fallback IS the
+    /// picker, not an association.
+    /// </summary>
+    private static bool TryQueryOpenCommand(string assoc)
+    {
+        var buffer = new char[1024];
+        uint length = (uint)buffer.Length;
+        uint queryResult = AssocQueryString(
+            AssocfNone,            AssocstrCommand,            assoc,            "open",            buffer,            ref length);
+        if (queryResult == HResultEPointer && length > (uint)buffer.Length)
+        {
+            buffer = new char[length];
+            queryResult = AssocQueryString(
+                AssocfNone,                AssocstrCommand,                assoc,                "open",                buffer,                ref length);
+        }
+
+        if (queryResult != 0)
+        {
+            return false;
+        }
+
+        string command = new string(
+                buffer,                0,                (int)Math.Min(length,(uint)buffer.Length))
+            .TrimEnd('\0');
+        return !string.IsNullOrWhiteSpace(command) &&
+               command.IndexOf(
+                   "OpenWith.exe",                   StringComparison.OrdinalIgnoreCase) < 0;
+    }
+
+    /// <summary>
+    /// Resolves the effective ProgId for the extension through the shell's
+    /// association chain — UserChoice first, then the class default. The
+    /// query fails when nothing is associated at all, which is what makes
+    /// it a proof of a default rather than of mere handler capability.
+    /// </summary>
+    private static bool TryQueryEffectiveProgId(string extension,out string progId)
+    {
+        progId = string.Empty;
+        var buffer = new char[512];
+        uint length = (uint)buffer.Length;
+        uint queryResult = AssocQueryString(
+            AssocfNone,            AssocstrProgId,            extension,            null,            buffer,            ref length);
+        if (queryResult == HResultEPointer && length > (uint)buffer.Length)
+        {
+            buffer = new char[length];
+            queryResult = AssocQueryString(
+                AssocfNone,                AssocstrProgId,                extension,                null,                buffer,                ref length);
+        }
+
+        if (queryResult != 0)
+        {
+            return false;
+        }
+
+        progId = new string(
+                buffer,                0,                (int)Math.Min(length,(uint)buffer.Length))
+            .TrimEnd('\0');
+        return !string.IsNullOrWhiteSpace(progId);
+    }
+
+    /// <summary>
+    /// Whether the extension's class-default ProgId carries a verb the Shell
+    /// can execute. Resolving the ProgId by name skips the extension's
+    /// UserChoice layer, so a stale or unverifiable UserChoice cannot hide a
+    /// working default.
+    /// </summary>
+    private static bool ClassDefaultHasOpenVerb(string extension)
+    {
+        try
+        {
+            using Microsoft.Win32.RegistryKey? extensionKey =
+                Microsoft.Win32.Registry.ClassesRoot.OpenSubKey(extension);
+            return extensionKey?.GetValue(null) is string progId &&
+                   !string.IsNullOrWhiteSpace(progId) &&
+                   ProgIdHasOpenVerb(progId);
+        }
+        catch (Exception)
+        {
+            return false;
+        }
+    }
+
+    /// <summary>
+    /// Whether a ProgId registration carries a verb the Shell can execute —
+    /// a classic command line or a packaged DelegateExecute command.
+    /// </summary>
+    private static bool ProgIdHasOpenVerb(string progId)
+    {
+        if (TryQueryOpenCommand(progId))
+        {
+            return true;
+        }
+
+        try
+        {
+            using Microsoft.Win32.RegistryKey? shellKey =
+                Microsoft.Win32.Registry.ClassesRoot.OpenSubKey(
+                    progId + "\\shell");
+            if (shellKey is null)
+            {
+                return false;
+            }
+
+            foreach (string verb in shellKey.GetSubKeyNames())
+            {
+                using Microsoft.Win32.RegistryKey? commandKey =
+                    shellKey.OpenSubKey(verb + "\\command");
+                if (commandKey is null)
+                {
+                    continue;
+                }
+
+                if (commandKey.GetValue(null) is string command &&
+                    !string.IsNullOrWhiteSpace(command))
+                {
+                    return true;
+                }
+
+                if (commandKey.GetValue("DelegateExecute") is string delegateExecute &&
+                    !string.IsNullOrWhiteSpace(delegateExecute))
+                {
+                    return true;
+                }
+            }
+
+            return false;
+        }
+        catch (Exception)
+        {
+            return false;
+        }
+    }
+
+    private const int ShcneRenameItem = 0x00000001;
+    private const int ShcneUpdateDir = 0x00001000;
+    private const uint ShcnfPathW = 0x0005;
+
+    [LibraryImport("shell32.dll", EntryPoint = "SHChangeNotify", StringMarshalling = StringMarshalling.Utf16)]
+    private static partial void SHChangeNotify(
+        int wEventId,        uint uFlags,        string? dwItem1,        string? dwItem2);
+
+    /// <summary>
+    /// Notifies the Shell that an entry moved so Explorer folder views
+    /// (including the desktop) drop stale icons. Raw file APIs used by the
+    /// managed transfer engine do not post this notification themselves.
+    /// </summary>
+    internal static void NotifyShellItemMoved(string oldPath,string newPath)
+    {
+        try
+        {
+            SHChangeNotify(ShcneRenameItem,ShcnfPathW,oldPath,newPath);
+        }
+        catch (Exception ex)
+        {
+            App.Log(
+                $"[ShellNotify] Move notification failed source='{oldPath}': " +
+                ex.Message);
+        }
+    }
+
+    /// <summary>
+    /// Asks shell folder views (including OneDrive-backed desktops) to
+    /// re-enumerate a directory. This is the programmatic equivalent of the
+    /// user pressing F5 and reliably clears entries left behind by raw file
+    /// operations on views that ignore per-item notifications.
+    /// </summary>
+    internal static void NotifyShellDirectoryUpdated(string directory)
+    {
+        try
+        {
+            SHChangeNotify(ShcneUpdateDir,ShcnfPathW,directory,null);
+        }
+        catch (Exception ex)
+        {
+            App.Log(
+                $"[ShellNotify] Directory update notification failed " +
+                $"directory='{directory}': {ex.Message}");
+        }
+    }
+
+    [LibraryImport("user32.dll", SetLastError = true)]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    public static partial bool RegisterHotKey(
+        IntPtr hWnd,        int id,        uint fsModifiers,        uint vk);
+
+    [LibraryImport("user32.dll", SetLastError = true)]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    public static partial bool UnregisterHotKey(
+        IntPtr hWnd,        int id);
+
+    [DllImport("comctl32.dll", EntryPoint = "SetWindowSubclass", SetLastError = true)]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    public static extern bool SetWindowSubclass(
+        IntPtr hWnd,        SubclassProc subclassProc,        UIntPtr uIdSubclass,        UIntPtr dwRefData);
+
+    [DllImport("comctl32.dll", EntryPoint = "RemoveWindowSubclass", SetLastError = true)]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    public static extern bool RemoveWindowSubclass(
+        IntPtr hWnd,        SubclassProc subclassProc,        UIntPtr uIdSubclass);
+
+    [DllImport("comctl32.dll", EntryPoint = "DefSubclassProc", SetLastError = true)]
+    public static extern IntPtr DefSubclassProc(
+        IntPtr hWnd,        uint message,        UIntPtr wParam,        IntPtr lParam);
+
+    public delegate IntPtr SubclassProc(
+        IntPtr hWnd,        uint message,        UIntPtr wParam,        IntPtr lParam,        UIntPtr uIdSubclass,        UIntPtr dwRefData);
+
+    [StructLayout(LayoutKind.Sequential)]
+    public struct NOTIFYICONIDENTIFIER
+    {
+        public uint cbSize;
+        public IntPtr hWnd;
+        public uint uID;
+        public Guid guidItem;
+    }
+
+    [LibraryImport("shell32.dll", SetLastError = true)]
+    public static partial int Shell_NotifyIconGetRect(ref NOTIFYICONIDENTIFIER identifier,out RECT iconLocation);
+
+    public static bool TryGetNotifyIconRect(IntPtr hWnd,Guid id,out RECT iconLocation)
+    {
+        var identifier = new NOTIFYICONIDENTIFIER
+        {
+            cbSize = (uint)Marshal.SizeOf<NOTIFYICONIDENTIFIER>(),
+            hWnd = hWnd,
+            guidItem = id
+        };
+
+        return Shell_NotifyIconGetRect(ref identifier,out iconLocation) == 0 &&
+               iconLocation.Right > iconLocation.Left &&
+               iconLocation.Bottom > iconLocation.Top;
+    }
+
+
+    // ────────────────────────────────────────────────────────────────
+    //  Convenience methods
+    // ────────────────────────────────────────────────────────────────
+
+    /// <summary>
+    /// Push a window to the bottom of the Z-order so it sits at desktop level.
+    /// </summary>
+    public static void SetWindowToBottom(IntPtr hWnd)
+    {
+        bool r1 = SetWindowPos(hWnd,HWND_NOTOPMOST,0,0,0,0,            SWP_NOMOVE | SWP_NOSIZE | SWP_NOACTIVATE);
+        bool r2 = SetWindowPos(hWnd,HWND_BOTTOM,0,0,0,0,            SWP_NOMOVE | SWP_NOSIZE | SWP_NOACTIVATE);
+        App.LogVerbose($"[ZOrder] SetWindowToBottom hwnd=0x{hWnd.ToInt64():X} r1={r1} r2={r2}");
+    }
+
+    /// <summary>
+    /// Push a window to desktop level without using HWND_BOTTOM.
+    /// This prevents the window from being hidden by Win+D while keeping it at desktop level.
+    /// </summary>
+    public static void SetWindowToDesktopLevel(IntPtr hWnd)
+    {
+        bool r = SetWindowPos(hWnd,HWND_NOTOPMOST,0,0,0,0,            SWP_NOMOVE | SWP_NOSIZE | SWP_NOACTIVATE);
+        App.Log($"[ZOrder] SetWindowToDesktopLevel hwnd=0x{hWnd.ToInt64():X} r={r}");
+    }
+
+    /// <summary>
+    /// Bring a window above other normal windows without making it topmost.
+    /// </summary>
+    public static void BringWindowToFront(IntPtr hWnd)
+    {
+        SetWindowPos(hWnd,HWND_TOP,0,0,0,0,            SWP_NOMOVE | SWP_NOSIZE | SWP_NOACTIVATE | SWP_SHOWWINDOW);
+    }
+
+    /// <summary>
+    /// Raise a window above normal application windows without leaving it always-on-top.
+    /// </summary>
+    public static void BringWindowTemporarilyToFront(IntPtr hWnd)
+    {
+        BringWindowTemporarilyToFront(hWnd,showWindow: true);
+    }
+
+    /// <summary>
+    /// Raise a window without optionally issuing another show request. Initial
+    /// presentation already shows the HWND while it is DWM-cloaked, so its
+    /// Z-order transaction must not generate two extra visible SHOWWINDOW
+    /// transitions before the cloak is removed.
+    /// </summary>
+    public static void BringWindowTemporarilyToFront(
+        IntPtr hWnd,        bool showWindow)
+    {
+        uint flags = SWP_NOMOVE | SWP_NOSIZE | SWP_NOACTIVATE;
+        if (showWindow)
+        {
+            flags |= SWP_SHOWWINDOW;
+        }
+
+        SetWindowPos(hWnd,HWND_TOPMOST,0,0,0,0,            flags);
+        SetWindowPos(hWnd,HWND_NOTOPMOST,0,0,0,0,            flags);
+    }
+
+    /// <summary>
+    /// Keep a window topmost while a native modal dialog is open.
+    /// </summary>
+    public static void SetWindowTopMost(IntPtr hWnd)
+    {
+        SetWindowTopMost(hWnd,showWindow: true);
+    }
+
+    /// <summary>
+    /// Keep a window topmost, optionally without forcing a hidden owner window visible.
+    /// </summary>
+    public static void SetWindowTopMost(IntPtr hWnd,bool showWindow)
+    {
+        uint flags = SWP_NOMOVE | SWP_NOSIZE | SWP_NOACTIVATE;
+        if (showWindow)
+        {
+            flags |= SWP_SHOWWINDOW;
+        }
+
+        SetWindowPos(hWnd,HWND_TOPMOST,0,0,0,0,            flags);
+    }
+
+    /// <summary>
+    /// Remove topmost state from a window without changing its size or position.
+    /// </summary>
+    public static void ClearWindowTopMost(IntPtr hWnd)
+    {
+        SetWindowPos(hWnd,HWND_NOTOPMOST,0,0,0,0,            SWP_NOMOVE | SWP_NOSIZE | SWP_NOACTIVATE);
+    }
+
+    public static bool IsWindowTopMost(IntPtr hWnd)
+    {
+        return (GetWindowLong(hWnd,GWL_EXSTYLE) & WS_EX_TOPMOST) != 0;
+    }
+
+    public static IReadOnlyList<IntPtr> FindVisibleDialogWindowsForCurrentProcess(IntPtr excludeHwnd)
+    {
+        return FindVisibleDialogWindowsForCurrentProcess(
+            excludeHwnd,            requiredOwnerHwnd: IntPtr.Zero);
+    }
+
+    public static IReadOnlyList<IntPtr> FindVisibleDialogWindowsForCurrentProcess(
+        IntPtr excludeHwnd,        IntPtr requiredOwnerHwnd)
+    {
+        uint currentProcessId = (uint)Environment.ProcessId;
+        var windows = new List<IntPtr>();
+
+        EnumWindows((hWnd,_) =>
+        {
+            if (hWnd == IntPtr.Zero || hWnd == excludeHwnd || !IsWindowVisible(hWnd))
+            {
+                return true;
+            }
+
+            GetWindowThreadProcessId(hWnd,out uint processId);
+            if (processId != currentProcessId)
+            {
+                return true;
+            }
+
+            if (requiredOwnerHwnd != IntPtr.Zero &&
+                !IsWindowOwnedBy(hWnd,requiredOwnerHwnd))
+            {
+                return true;
+            }
+
+            string className = GetWindowClassName(hWnd);
+            string title = GetWindowTitle(hWnd);
+            if (className.Equals("#32770",StringComparison.OrdinalIgnoreCase) ||
+                className.Equals("CabinetWClass",StringComparison.OrdinalIgnoreCase) ||
+                title.Contains("Select Folder",StringComparison.OrdinalIgnoreCase) ||
+                title.Contains("选择文件夹",StringComparison.OrdinalIgnoreCase) ||
+                title.Contains("浏览文件夹",StringComparison.OrdinalIgnoreCase))
+            {
+                windows.Add(hWnd);
+            }
+
+            return true;
+        },IntPtr.Zero);
+
+        return windows;
+    }
+
+    private static bool IsWindowOwnedBy(IntPtr windowHandle,IntPtr requiredOwnerHwnd)
+    {
+        IntPtr current = GetWindow(windowHandle,GW_OWNER);
+        for (int depth = 0; depth < 16 && current != IntPtr.Zero; depth++)
+        {
+            if (current == requiredOwnerHwnd)
+            {
+                return true;
+            }
+
+            current = GetWindow(current,GW_OWNER);
+        }
+
+        return false;
+    }
+
+    private static string GetWindowTitle(IntPtr hWnd)
+    {
+        var builder = new StringBuilder(256);
+        int length = GetWindowText(hWnd,builder,builder.Capacity);
+        return length > 0 ? builder.ToString(0,length) : string.Empty;
+    }
+
+    private static string GetWindowClassName(IntPtr hWnd)
+    {
+        var builder = new StringBuilder(256);
+        int length = GetClassName(hWnd,builder,builder.Capacity);
+        return length > 0 ? builder.ToString(0,length) : string.Empty;
+    }
+
+    [StructLayout(LayoutKind.Sequential)]
+    public struct MARGINS
+    {
+        public int cxLeftWidth;
+        public int cxRightWidth;
+        public int cyTopHeight;
+        public int cyBottomHeight;
+    }
+
+    [LibraryImport("dwmapi.dll")]
+    public static partial int DwmExtendFrameIntoClientArea(IntPtr hWnd,ref MARGINS pMarInset);
+
+    [LibraryImport("dwmapi.dll")]
+    public static partial int DwmSetWindowAttribute(IntPtr hwnd,int attr,ref int pvAttribute,int cbAttribute);
+
+    [LibraryImport("dwmapi.dll")]
+    public static partial int DwmGetWindowAttribute(IntPtr hwnd,int attr,out int pvAttribute,int cbAttribute);
+
+    [LibraryImport("dwmapi.dll")]
+    public static partial int DwmFlush();
+
+    /// <summary>
+    /// Blocks until the next DWM composition pass completes. Used as the Win10
+    /// present-aligned pacing source; returns false when dwmapi is unavailable
+    /// so the caller can fall back to a refresh-derived timer.
+    /// </summary>
+    public static bool TryDwmFlush()
+    {
+        try
+        {
+            return DwmFlush() == 0;
+        }
+        catch (Exception ex) when (
+            ex is DllNotFoundException or EntryPointNotFoundException or BadImageFormatException)
+        {
+            return false;
+        }
+    }
+
+    /// <summary>
+    /// Reports whether DWM is currently withholding the window from the
+    /// desktop (DWM_CLOAKED_APP or DWM_CLOAKED_SHELL — the shell cloaks
+    /// windows that live on a virtual desktop other than the active one).
+    /// An owned dialog is born on its owner's desktop and inherits the
+    /// cloak, so an interactive picker bound to a cloaked owner never
+    /// composes. A failed query reports not cloaked, preserving the
+    /// pre-check behavior on systems without the attribute.
+    /// </summary>
+    public static bool IsWindowCloaked(IntPtr hwnd)
+    {
+        try
+        {
+            return DwmGetWindowAttribute(
+                hwnd,                DWMWA_CLOAKED,                out int cloaked,                sizeof(int)) == 0 && cloaked != 0;
+        }
+        catch (Exception ex) when (
+            ex is DllNotFoundException or EntryPointNotFoundException or BadImageFormatException)
+        {
+            return false;
+        }
+    }
+
+    /// <summary>
+    /// Version-safe DWM attribute entry point.  Attributes 33, 34 and 38 are
+    /// Windows 11 additions; silently skip them on the Win10 compatibility
+    /// floor instead of relying on an ignored HRESULT at every call site.
+    /// </summary>
+    public static int TrySetDwmWindowAttribute(IntPtr hwnd,int attr,ref int value)
+    {
+        if (ShouldSkipDwmWindowAttribute(
+                attr,                Services.WindowsCompatibilityService.SupportsWin11DwmAttributes))
+        {
+            return 0;
+        }
+
+        try
+        {
+            return DwmSetWindowAttribute(hwnd,attr,ref value,sizeof(int));
+        }
+        catch
+        {
+            return -1;
+        }
+    }
+
+    /// <summary>
+    /// The Win10 floor guard of <see cref="TrySetDwmWindowAttribute"/> as a
+    /// pure function: attributes 33/34/38 are Windows 11 additions and are
+    /// dropped (return 0, no P/Invoke) when the OS cannot render them. This
+    /// branch is the only thing keeping those attributes from reaching
+    /// DwmSetWindowAttribute on Windows 10.
+    /// </summary>
+    internal static bool ShouldSkipDwmWindowAttribute(
+        int attr,        bool supportsWin11DwmAttributes) =>
+        !supportsWin11DwmAttributes &&
+        attr is DWMWA_BORDER_COLOR or DWMWA_WINDOW_CORNER_PREFERENCE or DWMWA_SYSTEMBACKDROP_TYPE;
+
+    public const int DWMWA_TRANSITIONS_FORCEDISABLED = 3;
+    public const int DWMWA_CLOAK = 13;
+    public const int DWMWA_CLOAKED = 14;
+    public const int DWMWA_USE_IMMERSIVE_DARK_MODE = 20;
+    public const int DWMWA_BORDER_COLOR = 34;
+    public const int DWMWA_WINDOW_CORNER_PREFERENCE = 33;
+    public const int DWMWA_SYSTEMBACKDROP_TYPE = 38;
+    public const int DWMWA_NCRENDERING_POLICY = 2;
+    public const int DWMNCRP_USEWINDOWSTYLE = 0;
+    public const int DWMNCRP_DISABLED = 1;
+    public const int DWMNCRP_ENABLED = 2;
+    public const int DWMWCP_DEFAULT = 0;
+    public const int DWMWCP_DONOTROUND = 1;
+    public const int DWMWCP_ROUND = 2;
+    public const int DWMWCP_ROUNDSMALL = 3;
+    public const int DWMSBT_AUTO = 0;
+    public const int DWMSBT_NONE = 1;
+    public const int DWMSBT_MAINWINDOW = 2;
+    public const int DWMSBT_TRANSIENTWINDOW = 3;
+    public const int DWMSBT_TABBEDWINDOW = 4;
+    public const int WCA_ACCENT_POLICY = 19;
+    public const int ACCENT_DISABLED = 0;
+    public const int ACCENT_ENABLE_GRADIENT = 1;
+    public const int ACCENT_ENABLE_TRANSPARENTGRADIENT = 2;
+    public const int ACCENT_ENABLE_BLURBEHIND = 3;
+    public const int ACCENT_ENABLE_ACRYLICBLURBEHIND = 4;
+    public const int ACCENT_ENABLE_HOSTBACKDROP = 5;
+    /// <summary>
+    /// Force a window to use dark mode (or light mode) for its system backdrop and borders.
+    /// </summary>
+    public static void SetWindowTheme(IntPtr hWnd,bool isDark)
+    {
+        int darkMode = isDark ? 1 : 0;
+        TrySetDwmWindowAttribute(hWnd,DWMWA_USE_IMMERSIVE_DARK_MODE,ref darkMode);
+    }
+
+    public static void ApplyFullWindowFrame(IntPtr hWnd)
+    {
+        var margins = new MARGINS
+        {
+            cxLeftWidth = -1,
+            cxRightWidth = -1,
+            cyTopHeight = -1,
+            cyBottomHeight = -1
+        };
+
+        DwmExtendFrameIntoClientArea(hWnd,ref margins);
+    }
+
+    [DllImport("kernel32.dll")]
+    private static extern IntPtr GetCurrentProcess();
+
+    [DllImport("kernel32.dll", SetLastError = true)]
+    private static extern bool SetProcessWorkingSetSize(
+        IntPtr hProcess,        IntPtr dwMinWorkingSetSize,        IntPtr dwMaxWorkingSetSize);
+
+    [DllImport("kernel32.dll", SetLastError = true)]
+    private static extern bool TerminateProcess(IntPtr hProcess,uint uExitCode);
+
+    /// <summary>
+    /// Kills this process without running exit handlers or waiting for any
+    /// runtime thread. Last-resort shutdown backstop only.
+    /// </summary>
+    public static void TerminateCurrentProcess(uint exitCode)
+    {
+        TerminateProcess(GetCurrentProcess(),exitCode);
+    }
+
+    /// <summary>
+    /// Pages the whole working set out (same effect as minimizing a window).
+    /// Historically only safe while every widget was hidden and the user was
+    /// idle: touched pages fault back in afterwards, which would jitter
+    /// interaction or frame pacing if anything were visible at the time.
+    /// The quiescence trim path may now also call this while widgets are
+    /// visible, but only behind its own gates: a 240 MB absolute working-set
+    /// floor, a per-tier quiet period (up to 15 s, escalated to the strictest
+    /// tier by looping ambient animation), hard blockers on interaction,
+    /// transient UI, and active visual work, plus a post-trim cooldown with a
+    /// regrowth gate. The immediate-hidden and visible-idle paths keep the
+    /// old hidden-or-user-away contract.
+    /// </summary>
+    public static bool TrimWorkingSet()
+    {
+        try
+        {
+            return SetProcessWorkingSetSize(
+                GetCurrentProcess(),                (IntPtr)(-1),                (IntPtr)(-1));
+        }
+        catch
+        {
+            return false;
+        }
+    }
+
+    /// <summary>
+    /// Sets the DWM system border color for a window.
+    /// Pass 0xFFFFFFFE for no border, 0xFFFFFFFF for automatic.
+    /// </summary>
+    public static void SetWindowBorderColor(IntPtr hWnd,int colorRef)
+    {
+        TrySetDwmWindowAttribute(hWnd,DWMWA_BORDER_COLOR,ref colorRef);
+    }
+
+    /// <summary>
+    /// Pure accent-state selection so interaction-time simplification (keep the
+    /// tint, drop the DWM blur) stays unit-testable.
+    /// </summary>
+    internal static int ResolveAccentState(bool enabled,bool blurEnabled,double opacity)
+    {
+        if (enabled)
+        {
+            if (!blurEnabled)
+            {
+                return ACCENT_ENABLE_TRANSPARENTGRADIENT;
+            }
+
+            return opacity <= 0.01
+                ? ACCENT_ENABLE_BLURBEHIND
+                : ACCENT_ENABLE_ACRYLICBLURBEHIND;
+        }
+
+        if (opacity <= 0.001)
+        {
+            return ACCENT_DISABLED;
+        }
+
+        return ACCENT_ENABLE_GRADIENT;
+    }
+
+    public static bool ApplyAccentBlur(
+        IntPtr hWnd,        Windows.UI.Color tintColor,        double opacity,        bool enabled,        bool blurEnabled = true)
+    {
+        opacity = Math.Clamp(opacity,0.0,1.0);
+
+        int accentState = ResolveAccentState(enabled,blurEnabled,opacity);
+        int accentFlags = 2;
+        uint gradientColor = ToAbgr(ApplyAlpha(tintColor,opacity));
+        if (accentState == ACCENT_DISABLED)
+        {
+            accentFlags = 0;
+            gradientColor = 0;
+        }
+
+        var accent = new AccentPolicy
+        {
+            AccentState = accentState,
+            AccentFlags = accentFlags,
+            GradientColor = gradientColor,
+            AnimationId = 0
+        };
+
+        int accentSize = Marshal.SizeOf<AccentPolicy>();
+        IntPtr accentPtr = Marshal.AllocHGlobal(accentSize);
+        try
+        {
+            Marshal.StructureToPtr(accent,accentPtr,false);
+            var data = new WindowCompositionAttributeData
+            {
+                Attribute = WCA_ACCENT_POLICY,
+                Data = accentPtr,
+                SizeOfData = accentSize
+            };
+
+            bool applied = SetWindowCompositionAttribute(hWnd,ref data);
+            int lastError = Marshal.GetLastWin32Error();
+            global::DeskBox.App.LogVerbose(
+                $"[Composition] hwnd=0x{hWnd.ToInt64():X} enabled={enabled} opacity={opacity:F3} " +
+                $"accentState={DescribeAccentState(accent.AccentState)} gradient=0x{accent.GradientColor:X8} " +
+                $"applied={applied} lastError={lastError}");
+            return applied;
+        }
+        finally
+        {
+            Marshal.FreeHGlobal(accentPtr);
+        }
+    }
+
+    public static void DisableAccentPolicy(IntPtr hWnd)
+    {
+        var accent = new AccentPolicy
+        {
+            AccentState = ACCENT_DISABLED,
+            AccentFlags = 0,
+            GradientColor = 0,
+            AnimationId = 0
+        };
+
+        ApplyAccentPolicy(hWnd,accent,enabled: false,opacity: 0.0);
+    }
+
+    private static void ApplyAccentPolicy(IntPtr hWnd,AccentPolicy accent,bool enabled,double opacity)
+    {
+        int accentSize = Marshal.SizeOf<AccentPolicy>();
+        IntPtr accentPtr = Marshal.AllocHGlobal(accentSize);
+        try
+        {
+            Marshal.StructureToPtr(accent,accentPtr,false);
+            var data = new WindowCompositionAttributeData
+            {
+                Attribute = WCA_ACCENT_POLICY,
+                Data = accentPtr,
+                SizeOfData = accentSize
+            };
+
+            bool applied = SetWindowCompositionAttribute(hWnd,ref data);
+            int lastError = Marshal.GetLastWin32Error();
+            global::DeskBox.App.LogVerbose(
+                $"[Composition] hwnd=0x{hWnd.ToInt64():X} enabled={enabled} opacity={opacity:F3} " +
+                $"accentState={DescribeAccentState(accent.AccentState)} gradient=0x{accent.GradientColor:X8} " +
+                $"applied={applied} lastError={lastError}");
+        }
+        finally
+        {
+            Marshal.FreeHGlobal(accentPtr);
+        }
+    }
+
+    private static Windows.UI.Color ApplyAlpha(Windows.UI.Color color,double opacity)
+    {
+        byte alpha = (byte)Math.Clamp(Math.Round(color.A * opacity),0,255);
+        return Windows.UI.Color.FromArgb(alpha,color.R,color.G,color.B);
+    }
+
+    private static uint ToAbgr(Windows.UI.Color color)
+    {
+        return ((uint)color.A << 24) |
+               ((uint)color.B << 16) |
+               ((uint)color.G << 8) |
+               color.R;
+    }
+
+    private static string DescribeAccentState(int accentState)
+    {
+        return accentState switch
+        {
+            ACCENT_DISABLED => "Disabled",            ACCENT_ENABLE_GRADIENT => "Gradient",            ACCENT_ENABLE_TRANSPARENTGRADIENT => "TransparentGradient",            ACCENT_ENABLE_BLURBEHIND => "BlurBehind",            ACCENT_ENABLE_ACRYLICBLURBEHIND => "AcrylicBlurBehind",            ACCENT_ENABLE_HOSTBACKDROP => "HostBackdrop",            _ => $"Unknown({accentState})"
+        };
+    }
+
+    /// <summary>
+    /// Queries the registry to check if Windows is currently using dark theme for apps.
+    /// </summary>
+    public static bool IsSystemDarkMode()
+    {
+        try
+        {
+            using var key = Microsoft.Win32.Registry.CurrentUser.OpenSubKey(@"Software\Microsoft\Windows\CurrentVersion\Themes\Personalize");
+            if (key?.GetValue("AppsUseLightTheme") is int value)
+            {
+                return value == 0;
+            }
+        }
+        catch { }
+        return false;
+    }
+
+    public static bool IsKeyPressed(Windows.System.VirtualKey key)
+    {
+        return (GetKeyState((int)key) & 0x8000) != 0;
+    }
+
+    [StructLayout(LayoutKind.Sequential)]
+    public struct POINT
+    {
+        public int X;
+        public int Y;
+    }
+
+    [LibraryImport("user32.dll")]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    public static partial bool GetCursorPos(out POINT lpPoint);
+
+    [LibraryImport("user32.dll")]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    public static partial bool ClientToScreen(IntPtr hWnd,ref POINT lpPoint);
+
+    [LibraryImport("user32.dll")]
+    private static partial uint GetMessagePos();
+
+    // GetMessagePos packs signed screen coordinates for the input message
+    // currently being dispatched; both words must be sign-extended so windows
+    // left of / above the primary monitor resolve correctly. It reflects the
+    // pointer event itself, not the shared cursor, so touch drags work.
+    private static bool IsPointOnVirtualDesktop(POINT point)
+    {
+        int vx = GetSystemMetrics(SM_XVIRTUALSCREEN);
+        int vy = GetSystemMetrics(SM_YVIRTUALSCREEN);
+        int width = GetSystemMetrics(SM_CXVIRTUALSCREEN);
+        int height = GetSystemMetrics(SM_CYVIRTUALSCREEN);
+        return width > 0 && height > 0 &&
+            point.X >= vx && point.X <= vx + width &&
+            point.Y >= vy && point.Y <= vy + height;
+    }
+
+    /// <summary>
+    /// Resolves the screen-space point of the pointer event being dispatched,
+    /// from the thread message queue (GetMessagePos) instead of the shared
+    /// mouse cursor. Touch contact never moves the cursor, so GetCursorPos-
+    /// based drag and resize math silently no-ops on touch. GetMessagePos is
+    /// also independent of this window's bounds, unlike the client-origin +
+    /// XAML-position conversion, which feedback-loops when window moves are
+    /// paced behind pointer events during fast drags; that conversion stays
+    /// as a fallback only.
+    /// </summary>
+    public static bool TryGetPointerScreenPoint(
+        IntPtr hWnd,        Microsoft.UI.Xaml.UIElement? relativeTo,        Microsoft.UI.Xaml.Input.PointerRoutedEventArgs e,        out POINT screenPoint)
+    {
+        screenPoint = default;
+        uint messagePos = GetMessagePos();
+        if (messagePos != 0)
+        {
+            var candidate = new POINT
+            {
+                X = (short)(messagePos & 0xFFFF),
+                Y = (short)(messagePos >> 16),
+            };
+            if (IsPointOnVirtualDesktop(candidate))
+            {
+                screenPoint = candidate;
+                return true;
+            }
+        }
+
+        if (relativeTo?.XamlRoot is not { } xamlRoot)
+        {
+            return false;
+        }
+
+        Windows.Foundation.Point position = e.GetCurrentPoint(relativeTo).Position;
+        double scale = GetDpiScaleForWindow(hWnd,xamlRoot);
+        var clientOrigin = default(POINT);
+        if (!ClientToScreen(hWnd,ref clientOrigin))
+        {
+            return false;
+        }
+
+        screenPoint = new POINT
+        {
+            X = clientOrigin.X + (int)Math.Round(position.X * scale),
+            Y = clientOrigin.Y + (int)Math.Round(position.Y * scale),
+        };
+        return true;
+    }
+
+    [StructLayout(LayoutKind.Sequential)]
+    public struct RECT
+    {
+        public int Left;
+        public int Top;
+        public int Right;
+        public int Bottom;
+    }
+
+    [StructLayout(LayoutKind.Sequential)]
+    public struct MONITORINFO
+    {
+        public int cbSize;
+        public RECT rcMonitor;
+        public RECT rcWork;
+        public uint dwFlags;
+    }
+
+    [StructLayout(LayoutKind.Sequential, CharSet = CharSet.Unicode)]
+    private struct MONITORINFOEX
+    {
+        public int cbSize;
+        public RECT rcMonitor;
+        public RECT rcWork;
+        public uint dwFlags;
+
+        [MarshalAs(UnmanagedType.ByValTStr, SizeConst = 32)]
+        public string szDevice;
+    }
+
+    [StructLayout(LayoutKind.Sequential, CharSet = CharSet.Unicode)]
+    private struct DEVMODE
+    {
+        [MarshalAs(UnmanagedType.ByValTStr, SizeConst = 32)]
+        public string dmDeviceName;
+        public short dmSpecVersion;
+        public short dmDriverVersion;
+        public short dmSize;
+        public short dmDriverExtra;
+        public int dmFields;
+        public int dmPositionX;
+        public int dmPositionY;
+        public int dmDisplayOrientation;
+        public int dmDisplayFixedOutput;
+        public short dmColor;
+        public short dmDuplex;
+        public short dmYResolution;
+        public short dmTTOption;
+        public short dmCollate;
+        [MarshalAs(UnmanagedType.ByValTStr, SizeConst = 32)]
+        public string dmFormName;
+        public short dmLogPixels;
+        public int dmBitsPerPel;
+        public int dmPelsWidth;
+        public int dmPelsHeight;
+        public int dmDisplayFlags;
+        public int dmDisplayFrequency;
+    }
+
+    private const uint MonitorInfoPrimary = 0x00000001;
+
+    public readonly record struct MonitorWorkAreaInfo(
+        RECT Monitor,        RECT WorkArea,        string DeviceName,        bool IsPrimary,        double DpiScale,        string StableId);
+
+    [StructLayout(LayoutKind.Sequential, CharSet = CharSet.Unicode)]
+    private struct DISPLAY_DEVICEW
+    {
+        public int cb;
+        [MarshalAs(UnmanagedType.ByValTStr, SizeConst = 32)]
+        public string DeviceName;
+        [MarshalAs(UnmanagedType.ByValTStr, SizeConst = 128)]
+        public string DeviceString;
+        public uint StateFlags;
+        [MarshalAs(UnmanagedType.ByValTStr, SizeConst = 128)]
+        public string DeviceID;
+        [MarshalAs(UnmanagedType.ByValTStr, SizeConst = 128)]
+        public string DeviceKey;
+    }
+
+    [DllImport("user32.dll", CharSet = CharSet.Unicode, SetLastError = true)]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    private static extern bool EnumDisplayDevicesW(
+        string? lpDevice,        uint iDevNum,        ref DISPLAY_DEVICEW lpDisplayDevice,        uint dwFlags);
+
+    /// <summary>
+    /// Returns the display adapter (PNP device id and description) backing the
+    /// primary monitor. Virtual display drivers enumerate under the ROOT
+    /// device tree, which lets callers recognize cloud-gaming/indirect
+    /// adapters that WinUI 3 handles poorly.
+    /// </summary>
+    public static bool TryGetPrimaryDisplayAdapter(
+        out string deviceId,        out string deviceString)
+    {
+        deviceId = string.Empty;
+        deviceString = string.Empty;
+
+        foreach (MonitorWorkAreaInfo monitor in GetMonitorWorkAreaInfos())
+        {
+            if (!monitor.IsPrimary || string.IsNullOrWhiteSpace(monitor.DeviceName))
+            {
+                continue;
+            }
+
+            var adapter = new DISPLAY_DEVICEW
+            {
+                cb = Marshal.SizeOf<DISPLAY_DEVICEW>()
+            };
+            if (!EnumDisplayDevicesW(monitor.DeviceName,0,ref adapter,0))
+            {
+                return false;
+            }
+
+            deviceId = adapter.DeviceID ?? string.Empty;
+            deviceString = adapter.DeviceString ?? string.Empty;
+            return true;
+        }
+
+        return false;
+    }
+
+    [LibraryImport("user32.dll")]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    public static partial bool GetWindowRect(IntPtr hWnd,out RECT lpRect);
+
+    public const uint MONITOR_DEFAULTTONEAREST = 2;
+    public const uint MONITOR_DEFAULTTOPRIMARY = 1;
+    private const int EnumCurrentSettings = -1;
+
+    [LibraryImport("user32.dll")]
+    public static partial IntPtr MonitorFromPoint(POINT pt,uint dwFlags);
+
+    [LibraryImport("user32.dll")]
+    public static partial IntPtr MonitorFromWindow(IntPtr hWnd,uint dwFlags);
+
+    [DllImport("user32.dll", EntryPoint = "EnumDisplaySettingsW", CharSet = CharSet.Unicode)]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    private static extern bool EnumDisplaySettings(
+        string lpszDeviceName,        int iModeNum,        ref DEVMODE lpDevMode);
+
+    private enum MonitorDpiType
+    {
+        EffectiveDpi = 0
+    }
+
+    [LibraryImport("shcore.dll")]
+    private static partial int GetDpiForMonitor(
+        IntPtr hmonitor,        MonitorDpiType dpiType,        out uint dpiX,        out uint dpiY);
+
+    private static double GetDpiScaleForMonitor(IntPtr hMonitor)
+    {
+        try
+        {
+            int hr = GetDpiForMonitor(hMonitor,MonitorDpiType.EffectiveDpi,out uint dpiX,out _);
+            return hr == 0 && dpiX > 0 ? dpiX / 96.0 : 1.0;
+        }
+        catch (DllNotFoundException)
+        {
+            return 1.0;
+        }
+        catch (EntryPointNotFoundException)
+        {
+            return 1.0;
+        }
+    }
+
+    [LibraryImport("user32.dll")]
+    private static partial uint GetDpiForWindow(IntPtr hWnd);
+
+    [LibraryImport("user32.dll", EntryPoint = "GetMonitorInfoW", SetLastError = true)]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    public static partial bool GetMonitorInfo(IntPtr hMonitor,ref MONITORINFO lpmi);
+
+    [DllImport("user32.dll", EntryPoint = "GetMonitorInfoW", CharSet = CharSet.Unicode, SetLastError = true)]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    private static extern bool GetMonitorInfoEx(IntPtr hMonitor,ref MONITORINFOEX lpmi);
+
+    public delegate bool MonitorEnumProc(IntPtr hMonitor,IntPtr hdcMonitor,ref RECT lprcMonitor,IntPtr dwData);
+
+    [LibraryImport("user32.dll", SetLastError = true)]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    public static partial bool EnumDisplayMonitors(
+        IntPtr hdc,        IntPtr lprcClip,        MonitorEnumProc lpfnEnum,        IntPtr dwData);
+
+    public static bool TryGetMonitorWorkArea(int x,int y,out RECT monitor,out RECT workArea)
+    {
+        var point = new POINT
+        {
+            X = x,
+            Y = y
+        };
+        IntPtr handle = MonitorFromPoint(point,MONITOR_DEFAULTTONEAREST);
+        if (handle == IntPtr.Zero)
+        {
+            monitor = default;
+            workArea = default;
+            return false;
+        }
+
+        var info = new MONITORINFO
+        {
+            cbSize = Marshal.SizeOf<MONITORINFO>()
+        };
+
+        if (!GetMonitorInfo(handle,ref info))
+        {
+            monitor = default;
+            workArea = default;
+            return false;
+        }
+
+        monitor = info.rcMonitor;
+        workArea = info.rcWork;
+        return true;
+    }
+
+    public static double GetDpiScaleForPoint(int x,int y)
+    {
+        var point = new POINT
+        {
+            X = x,
+            Y = y
+        };
+        IntPtr handle = MonitorFromPoint(point,MONITOR_DEFAULTTONEAREST);
+        if (handle == IntPtr.Zero)
+        {
+            return 1.0;
+        }
+
+        try
+        {
+            int hr = GetDpiForMonitor(handle,MonitorDpiType.EffectiveDpi,out uint dpiX,out _);
+            return hr == 0 && dpiX > 0
+                ? dpiX / 96.0
+                : 1.0;
+        }
+        catch (DllNotFoundException)
+        {
+            return 1.0;
+        }
+        catch (EntryPointNotFoundException)
+        {
+            return 1.0;
+        }
+    }
+
+    /// <summary>
+    /// Full physical monitor rectangle of the display currently containing
+    /// the window. Per-monitor consumers (panorama background fitting) must
+    /// key off this rect rather than the virtual-desktop union — the union
+    /// mixes monitor DPI scales and only behaves like one canvas when every
+    /// monitor shares a single scale.
+    /// </summary>
+    public static bool TryGetWindowMonitorRect(IntPtr hWnd,out RECT monitorRect)
+    {
+        monitorRect = default;
+        if (hWnd == IntPtr.Zero)
+        {
+            return false;
+        }
+
+        try
+        {
+            IntPtr monitor = MonitorFromWindow(hWnd,MONITOR_DEFAULTTONEAREST);
+            if (monitor == IntPtr.Zero)
+            {
+                return false;
+            }
+
+            var info = new MONITORINFO
+            {
+                cbSize = Marshal.SizeOf<MONITORINFO>()
+            };
+            if (!GetMonitorInfo(monitor,ref info))
+            {
+                return false;
+            }
+
+            monitorRect = info.rcMonitor;
+            return true;
+        }
+        catch (Exception ex) when (
+            ex is DllNotFoundException or EntryPointNotFoundException or BadImageFormatException)
+        {
+            return false;
+        }
+    }
+
+    /// <summary>
+    /// Returns the refresh rate of the monitor currently containing the window.
+    /// Invalid driver values safely normalize to 60 Hz.
+    /// </summary>
+    public static int GetDisplayRefreshRateForWindow(IntPtr hWnd)
+    {
+        try
+        {
+            IntPtr monitor = MonitorFromWindow(hWnd,MONITOR_DEFAULTTONEAREST);
+            if (monitor == IntPtr.Zero)
+            {
+                return WidgetDisplayRefreshRatePolicy.DefaultRefreshRateHz;
+            }
+
+            var monitorInfo = new MONITORINFOEX
+            {
+                cbSize = Marshal.SizeOf<MONITORINFOEX>(),
+                szDevice = string.Empty
+            };
+            if (!GetMonitorInfoEx(monitor,ref monitorInfo) ||
+                string.IsNullOrWhiteSpace(monitorInfo.szDevice))
+            {
+                return WidgetDisplayRefreshRatePolicy.DefaultRefreshRateHz;
+            }
+
+            var mode = new DEVMODE
+            {
+                dmDeviceName = string.Empty,
+                dmFormName = string.Empty,
+                dmSize = (short)Marshal.SizeOf<DEVMODE>()
+            };
+            return EnumDisplaySettings(monitorInfo.szDevice,EnumCurrentSettings,ref mode)
+                ? WidgetDisplayRefreshRatePolicy.Normalize((uint)Math.Max(0,mode.dmDisplayFrequency))
+                : WidgetDisplayRefreshRatePolicy.DefaultRefreshRateHz;
+        }
+        catch (Exception ex) when (
+            ex is DllNotFoundException or EntryPointNotFoundException or BadImageFormatException)
+        {
+            return WidgetDisplayRefreshRatePolicy.DefaultRefreshRateHz;
+        }
+    }
+
+    /// <summary>
+    /// Gets the DPI scale for a window handle, using the XAML RasterizationScale
+    /// when available and falling back to GetDpiForWindow.
+    /// </summary>
+    public static double GetDpiScaleForWindow(IntPtr hWnd,Microsoft.UI.Xaml.XamlRoot? xamlRoot)
+    {
+        double xamlScale = xamlRoot?.RasterizationScale ?? 0;
+        if (xamlScale > 0)
+        {
+            return xamlScale;
+        }
+
+        try
+        {
+            uint dpi = GetDpiForWindow(hWnd);
+            return dpi > 0 ? dpi / 96.0 : 1.0;
+        }
+        catch (EntryPointNotFoundException)
+        {
+            return 1.0;
+        }
+    }
+
+    public static IReadOnlyList<(RECT Monitor, RECT WorkArea)> GetMonitorWorkAreas()
+    {
+        return GetMonitorWorkAreaInfos()
+            .Select(area => (area.Monitor, area.WorkArea))
+            .ToList();
+    }
+
+    public static IReadOnlyList<MonitorWorkAreaInfo> GetMonitorWorkAreaInfos()
+    {
+        var areas = new List<MonitorWorkAreaInfo>();
+        EnumDisplayMonitors(
+            IntPtr.Zero,            IntPtr.Zero,            (IntPtr hMonitor,IntPtr _,ref RECT _,IntPtr _) =>
+            {
+                var info = new MONITORINFOEX
+                {
+                    cbSize = Marshal.SizeOf<MONITORINFOEX>(),
+                    szDevice = string.Empty
+                };
+                if (GetMonitorInfoEx(hMonitor,ref info))
+                {
+                    string deviceName = info.szDevice ?? string.Empty;
+                    areas.Add(new MonitorWorkAreaInfo(
+                        info.rcMonitor,                        info.rcWork,                        deviceName,                        (info.dwFlags & MonitorInfoPrimary) == MonitorInfoPrimary,                        GetDpiScaleForMonitor(hMonitor),                        ResolveStableMonitorId(deviceName)));
+                }
+                else
+                {
+                    var fallbackInfo = new MONITORINFO
+                    {
+                        cbSize = Marshal.SizeOf<MONITORINFO>()
+                    };
+                    if (GetMonitorInfo(hMonitor,ref fallbackInfo))
+                    {
+                        areas.Add(new MonitorWorkAreaInfo(
+                            fallbackInfo.rcMonitor,                            fallbackInfo.rcWork,                            string.Empty,                            (fallbackInfo.dwFlags & MonitorInfoPrimary) == MonitorInfoPrimary,                            GetDpiScaleForMonitor(hMonitor),                            ResolveStableMonitorId(null)));
+                    }
+                }
+
+                return true;
+            },            IntPtr.Zero);
+
+        return areas;
+    }
+
+    /// <summary>EnumDisplayDevices dwFlags: retrieve the device interface name for the monitor.</summary>
+    private const uint EddGetDeviceInterfaceName = 0x00000001;
+
+    /// <summary>
+    /// Best-effort stable identity for a monitor: the PnP device interface id
+    /// when the adapter exposes one, otherwise the registry device key, and
+    /// finally the (unstable) <c>\\.\DISPLAYn</c> name. Unlike the device name,
+    /// the first two survive the renumbering Windows performs around lock,
+    /// sleep, and display-mode switches, so persisted monitor references key
+    /// on this value.
+    /// </summary>
+    public static string ResolveStableMonitorId(string? deviceName)
+    {
+        string fallback = string.IsNullOrWhiteSpace(deviceName) ? "unknown-display" : deviceName.Trim();
+        if (string.IsNullOrWhiteSpace(deviceName))
+        {
+            return fallback;
+        }
+
+        try
+        {
+            var displayDevice = new DisplayDevice
+            {
+                Size = Marshal.SizeOf<DisplayDevice>(),
+                DeviceName = string.Empty,
+                DeviceString = string.Empty,
+                DeviceId = string.Empty,
+                DeviceKey = string.Empty
+            };
+            if (EnumDisplayDevices(
+                    deviceName,                    0,                    ref displayDevice,                    EddGetDeviceInterfaceName))
+            {
+                if (!string.IsNullOrWhiteSpace(displayDevice.DeviceId))
+                {
+                    return displayDevice.DeviceId.Trim();
+                }
+
+                if (!string.IsNullOrWhiteSpace(displayDevice.DeviceKey))
+                {
+                    return displayDevice.DeviceKey.Trim();
+                }
+            }
+        }
+        catch (Exception ex) when (
+            ex is DllNotFoundException or
+                EntryPointNotFoundException or
+                BadImageFormatException or
+                MarshalDirectiveException or
+                TypeLoadException)
+        {
+        }
+
+        return fallback;
+    }
+
+    /// <summary>
+    /// Open a file or URL using the default associated application.
+    /// </summary>
+    /// <remarks>
+    /// First delegates to the running Explorer desktop process so launched applications
+    /// inherit the current user shell environment rather than DeskBox's potentially stale
+    /// startup environment. If Explorer is unavailable, falls back to ShellExecuteEx via
+    /// <see cref="Process.Start(ProcessStartInfo)"/> with the Shell default verb — the
+    /// desktop double-click dispatch — instead of an explicit "open" verb (feedback 246).
+    /// <paramref name="ownerWindow"/> is forwarded to the "Open With" fallback so any
+    /// system dialog has a real parent.
+    /// </remarks>
+    public static bool OpenFileOrChooseApp(IntPtr ownerWindow,string path)
+    {
+        // Win32 ERROR_NO_ASSOCIATION: "No application is associated with the specified
+        // file for this operation." ShellExecuteEx surfaces this (1155) rather than the
+        // legacy SE_ERR_NOASSOC (31) that raw ShellExecute returns.
+        const int ErrorNoAssociation = 1155;
+
+        string directory = ResolveShellLaunchDirectory(path);
+        // Which implementation and branch handled this open is the only way to
+        // tell "Windows accepted it" from "the app actually started" after the
+        // fact; the release build only ever runs the Rust implementation.
+        string explorerBackend =
+            ExplorerShellLaunchBackendPolicy.Current ==
+                ExplorerShellLaunchBackendMode.Rust
+                ? "rust"
+                : "csharp";
+        if (ExplorerLaunchCircuitBreaker.ShouldBypassExplorerHostedLaunch())
+        {
+            // #455: RPC-class failures mean the Explorer desktop thread is
+            // unhealthy, and every further explorer-hosted open re-pays the
+            // same synchronous cross-process COM storm. Stay on the local
+            // path until the breaker sees a restarted shell.
+            App.Log(
+                "[OpenFile] Explorer-hosted launch bypassed (circuit open, explorer restarted or RPC failures) " +
+                $"path='{path}'");
+        }
+        else if (ExplorerShellLaunchService.TryOpen(
+                path,                directory,                "open",                out string? explorerLaunchError,                out ExplorerShellLaunchNativeCallResult? explorerLaunchResult,                out int explorerLaunchHResult))
+        {
+            ExplorerLaunchCircuitBreaker.RecordSuccess();
+            App.Log(
+                $"[OpenFile] backend=explorer-hosted implementation={explorerBackend} " +
+                $"path='{path}'" +
+                (explorerLaunchResult is { } native
+                    ? $" applicationHr=0x{native.ApplicationHResult:X8}" +
+                      $" executeHr=0x{native.ExecuteHResult:X8}"
+                    : string.Empty));
+            return true;
+        }
+        else
+        {
+            ExplorerLaunchCircuitBreaker.RecordFailure(explorerLaunchHResult);
+            App.Log(
+                $"[OpenFile] Explorer-hosted launch unavailable for '{path}': " +
+                $"implementation={explorerBackend} " +
+                $"{explorerLaunchError ?? "unknown error"}. Falling back to local ShellExecuteEx.");
+        }
+
+        var startInfo = new ProcessStartInfo
+        {
+            FileName = path,
+            UseShellExecute = true,
+            WorkingDirectory = directory
+            // Deliberately no Verb (feedback 246): a NULL verb is the desktop
+            // double-click dispatch. An explicit "open" verb both forces
+            // default-verb classes (templates: feedback 366) open as regular
+            // documents and breaks when the OS-side "open" resolution alone
+            // is damaged — the same machine still double-clicks fine.
+        };
+
+        using IDisposable? electronRunAsNodeScope = SuppressElectronRunAsNodeForChildLaunch();
+        LocalShellExecuteCompletionMarker pendingLocalLaunch =
+            WatchPendingLocalShellExecute(path);
+
+        try
+        {
+            Process.Start(startInfo);
+            pendingLocalLaunch.MarkCompleted();
+            App.Log(
+                $"[OpenFile] backend=local-shell-execute path='{path}'");
+            return true;
+        }
+        catch (Win32Exception ex) when (ex.NativeErrorCode == ErrorNoAssociation)
+        {
+            // No default handler registered (or the UserChoice association is broken).
+            if (ShortcutTargetProbe.IsUncPath(path) &&
+                TryOpenUncWithExplorer(ownerWindow,path))
+            {
+                return true;
+            }
+
+            // Offer the system "Open With" dialog with the real owner window so the user
+            // can pick an app instead of getting a silent no-op.
+            App.Log($"[OpenFile] No association for '{path}' (ERROR_NO_ASSOCIATION). Falling back to Open With.");
+            return ShowOpenWithDialog(ownerWindow,path);
+        }
+        catch (Exception ex)
+        {
+            if (ShortcutTargetProbe.IsUncPath(path) &&
+                TryOpenUncWithExplorer(ownerWindow,path))
+            {
+                return true;
+            }
+
+            App.Log($"[OpenFile] Failed to open '{path}': {ex.Message}");
+            return false;
+        }
+    }
+
+    /// <summary>
+    /// Opens <paramref name="path"/> locally with the Shell's default verb — the
+    /// dispatch a desktop double-click performs — instead of the explicit "open"
+    /// verb, and without delegating to the Explorer desktop process. Used for the
+    /// classes where an explicit "open" verb is wrong or fragile: folder
+    /// shortcuts (#459, third-party file managers register as the Folder default
+    /// handler), template documents (feedback 366, the default "New" verb creates
+    /// a copy instead of opening — and enabling an overwrite of — the template),
+    /// and shortcuts to local files (feedback 246, the default verb is exactly
+    /// what the desktop dispatches and local failures throw instead of dying
+    /// silently in Explorer's fire-and-forget). Shares the local-launch pipeline
+    /// (environment scrub, pending observation) with the fallback in
+    /// <see cref="OpenFileOrChooseApp(IntPtr, string)"/>.
+    /// </summary>
+    internal static bool OpenWithDefaultVerbLocally(string path,string workingDirectory)
+    {
+        var startInfo = new ProcessStartInfo
+        {
+            FileName = path,
+            UseShellExecute = true,
+            WorkingDirectory = workingDirectory
+            // Deliberately no Verb: a NULL verb is the desktop double-click
+            // dispatch, which resolves the target's default handler.
+        };
+
+        using IDisposable? electronRunAsNodeScope = SuppressElectronRunAsNodeForChildLaunch();
+        LocalShellExecuteCompletionMarker pendingLocalLaunch =
+            WatchPendingLocalShellExecute(path);
+
+        try
+        {
+            Process.Start(startInfo);
+            pendingLocalLaunch.MarkCompleted();
+            App.Log(
+                $"[OpenFile] backend=local-default-verb path='{path}'");
+            return true;
+        }
+        catch (Exception ex)
+        {
+            App.Log($"[OpenFile] Failed to open '{path}' with the default verb: {ex.Message}");
+            return false;
+        }
+    }
+
+    /// <summary>
+    /// ELECTRON_RUN_AS_NODE=1 makes any Electron-based default handler (MarkText,
+    /// VS Code, Obsidian, ...) run as a plain Node.js process and crash trying to
+    /// execute the target file as a script. Explorer doesn't carry this variable, so
+    /// double-clicking there works; a process launched from developer tooling that
+    /// sets it (e.g., an Electron-based host shell) would otherwise break opening
+    /// such files. UseShellExecute=true cannot set a custom env block, so temporarily
+    /// clear it from this process's environment and restore it on disposal, so the
+    /// child behaves like it does from Explorer. Returns null when the variable is
+    /// not set.
+    /// </summary>
+    private static IDisposable? SuppressElectronRunAsNodeForChildLaunch()
+    {
+        string? savedElectronRunAsNode = Environment.GetEnvironmentVariable("ELECTRON_RUN_AS_NODE");
+        if (savedElectronRunAsNode is null)
+        {
+            return null;
+        }
+
+        Environment.SetEnvironmentVariable("ELECTRON_RUN_AS_NODE",null);
+        return new EnvironmentVariableRestoreScope("ELECTRON_RUN_AS_NODE",savedElectronRunAsNode);
+    }
+
+    private sealed class EnvironmentVariableRestoreScope : IDisposable
+    {
+        private readonly string _name;
+        private readonly string? _value;
+
+        internal EnvironmentVariableRestoreScope(string name,string? value)
+        {
+            _name = name;
+            _value = value;
+        }
+
+        public void Dispose()
+        {
+            Environment.SetEnvironmentVariable(_name,_value);
+        }
+    }
+
+    private const int LocalShellExecutePendingLogSeconds = 15;
+
+    /// <summary>
+    /// Starts the one-shot pending marker shared by every local ShellExecuteEx
+    /// launch.
+    /// </summary>
+    private static LocalShellExecuteCompletionMarker WatchPendingLocalShellExecute(string path)
+    {
+        // Observation only: never abort the call or release the caller's slot —
+        // native Shell calls cannot be safely aborted (BoundedStaOperationRunner
+        // relies on that invariant), and ShellExecuteEx may sit in legitimate
+        // modal UI (UAC, SmartScreen) for as long as the user takes. A pending
+        // marker after this threshold separates those opens from a wedged Shell
+        // (feedback #9: .lnk resolution never returned on a machine whose
+        // Explorer desktop window was missing from ShellWindows).
+        var marker = new LocalShellExecuteCompletionMarker();
+        _ = Task.Delay(TimeSpan.FromSeconds(LocalShellExecutePendingLogSeconds))
+            .ContinueWith(
+                _ =>
+                {
+                    if (marker.Completed)
+                    {
+                        return;
+                    }
+
+                    App.Log(
+                        $"[OpenFile] local ShellExecuteEx still pending for '{path}' after " +
+                        $"{LocalShellExecutePendingLogSeconds}s (system Shell may be unresponsive).");
+                },                TaskScheduler.Default);
+        return marker;
+    }
+
+    private sealed class LocalShellExecuteCompletionMarker
+    {
+        // Volatile: the timer thread reads what the caller thread writes;
+        // a stale read only costs a wrong pending log line.
+        private volatile bool _completed;
+
+        internal bool Completed => _completed;
+
+        internal void MarkCompleted()
+        {
+            _completed = true;
+        }
+    }
+
+    private static bool ShowOpenWithDialog(IntPtr ownerWindow,string path)
+    {
+        // Offer the system "Open With" dialog with the real owner window so
+        // the user can pick an app instead of getting a silent no-op. A user
+        // dismissal returns S_OK on current Windows, so it is reported as
+        // handled: no reliable cancellation signal exists.
+        var openAsInfo = new OpenAsInfo
+        {
+            File = path,
+            Class = null,
+            Flags = OpenAsInfoFlags.AllowRegistration | OpenAsInfoFlags.Execute
+        };
+
+        int hResult = SHOpenWithDialog(ownerWindow,ref openAsInfo);
+        if (hResult < 0)
+        {
+            App.Log($"[OpenFile] Open With failed with HRESULT 0x{hResult:X8} for '{path}'");
+            return false;
+        }
+
+        return true;
+    }
+
+    internal static string ResolveShellLaunchDirectory(string path)
+    {
+        if (Uri.TryCreate(path,UriKind.Absolute,out Uri? uri) && !uri.IsFile)
+        {
+            return string.Empty;
+        }
+
+        return Path.GetDirectoryName(path) ?? string.Empty;
+    }
+
+    private static bool TryOpenUncWithExplorer(IntPtr ownerWindow,string path)
+    {
+        try
+        {
+            IntPtr result = ShellExecute(
+                ownerWindow,                "open",                "explorer.exe",                $"\"{path}\"",                null,                SW_SHOWNORMAL);
+            long errorCode = (long)result;
+            if (errorCode <= 32)
+            {
+                App.Log(
+                    $"[OpenFile] UNC Explorer fallback failed for '{path}', " +
+                    $"error code={errorCode}");
+                return false;
+            }
+
+            App.Log($"[OpenFile] UNC Explorer fallback dispatched for '{path}'");
+            return true;
+        }
+        catch (Exception ex)
+        {
+            App.Log(
+                $"[OpenFile] UNC Explorer fallback threw for '{path}': {ex.Message}");
+            return false;
+        }
+    }
+
+    public static void OpenFile(string path)
+    {
+        _ = OpenFileOrChooseApp(IntPtr.Zero,path);
+    }
+
+    /// <summary>
+    /// Open a file or URL using the default associated application, forwarding a real
+    /// owner window handle so any system UI (Open With, UAC) is parented correctly
+    /// instead of being left behind a topmost widget. Returns false on failure rather
+    /// than swallowing it.
+    /// </summary>
+    public static bool OpenFile(IntPtr ownerWindow,string path)
+    {
+        return OpenFileOrChooseApp(ownerWindow,path);
+    }
+
+    [Flags]
+    private enum OpenAsInfoFlags : uint
+    {
+        AllowRegistration = 0x00000001,
+        Execute = 0x00000004
+    }
+
+    [StructLayout(LayoutKind.Sequential, CharSet = CharSet.Unicode)]
+    private struct OpenAsInfo
+    {
+        [MarshalAs(UnmanagedType.LPWStr)]
+        public string File;
+
+        [MarshalAs(UnmanagedType.LPWStr)]
+        public string? Class;
+
+        public OpenAsInfoFlags Flags;
+    }
+
+    /// <summary>
+    /// Open Windows Explorer with the specified file selected.
+    /// </summary>
+    public static void ShowInExplorer(string path)
+    {
+        var result = ShellExecute(IntPtr.Zero,"open","explorer.exe",            $"/select,\"{path}\"",null,SW_SHOWNORMAL);
+
+        // ShellExecute returns an error code (<= 32) when it fails.
+        if ((long)result <= 32)
+        {
+            App.Log($"[ShowInExplorer] ShellExecute failed for '{path}', error code={(long)result}");
+        }
+    }
+
+    [StructLayout(LayoutKind.Sequential)]
+    public struct DispatcherQueueOptions
+    {
+        public int dwSize;
+        public int threadType;
+        public int apartmentType;
+    }
+
+    [LibraryImport("CoreMessaging.dll")]
+    public static partial int CreateDispatcherQueueController(
+        DispatcherQueueOptions options,        ref IntPtr dispatcherQueueController);
+
+    private static IntPtr _dispatcherQueueController = IntPtr.Zero;
+
+    /// <summary>
+    /// Ensures that a UWP DispatcherQueue is initialized on the current thread.
+    /// Required for UWP composition API usage (e.g. transparent backdrops).
+    /// </summary>
+    public static void EnsureSystemDispatcherQueue()
+    {
+        if (Windows.System.DispatcherQueue.GetForCurrentThread() != null)
+        {
+            return;
+        }
+
+        if (_dispatcherQueueController == IntPtr.Zero)
+        {
+            DispatcherQueueOptions options = new DispatcherQueueOptions
+            {
+                dwSize = Marshal.SizeOf<DispatcherQueueOptions>(),
+                threadType = 2, // DQTYPE_THREAD_CURRENT
+                apartmentType = 2 // DQTAT_COM_STA
+            };
+
+            CreateDispatcherQueueController(options,ref _dispatcherQueueController);
+        }
+    }
+}

@@ -1,0 +1,28 @@
+{
+  "name": "worried",
+  "emotion": "worried",
+  "fps": 12,
+  "frameCount": 1,
+  "loop": true,
+  "priority": 22,
+  "mouthAnchor": {
+    "frame": 0,
+    "x": 180,
+    "y": 108
+  },
+  "transitionIn": "",
+  "transitionOut": "",
+  "canvas": {
+    "width": 420,
+    "height": 560
+  },
+  "groundY": 540,
+  "frames": [
+    {
+      "file": "0000.png",
+      "sha256": "17cb03228e4c625f620c25fdafc1839f08dd67f16d3ce05543f31ba729c45907"
+    }
+  ],
+  "reviewed": true,
+  "sourceSha256": "5943cefeb9e86bcee4b37155f16c0b7c0698fdbeac14f20aed6947368ef1c02b"
+}

@@ -1,0 +1,82 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net10.0-windows10.0.22621.0</TargetFramework>
+    <SupportedOSPlatformVersion>10.0.19041.0</SupportedOSPlatformVersion>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <RuntimeIdentifiers>win-x64;win-arm64</RuntimeIdentifiers>
+    <RuntimeIdentifier Condition="'$(RuntimeIdentifier)' == ''">win-x64</RuntimeIdentifier>
+    <Platform Condition="'$(Platform)' == ''">x64</Platform>
+
+    <IsPackable>false</IsPackable>
+    <IsTestProject>true</IsTestProject>
+    <DeskBoxNativeTestPlatform Condition="'$(Platform)' == 'ARM64' Or '$(RuntimeIdentifier)' == 'win-arm64'">ARM64</DeskBoxNativeTestPlatform>
+    <DeskBoxNativeTestPlatform Condition="'$(DeskBoxNativeTestPlatform)' == ''">x64</DeskBoxNativeTestPlatform>
+    <DeskBoxRustCrtLinkage Condition="'$(DeskBoxRustCrtLinkage)' == ''">Static</DeskBoxRustCrtLinkage>
+    <DeskBoxNativeTestIntermediateDir>$(MSBuildProjectDirectory)\obj\rust-native\$(Configuration)\$(Platform)\$(RuntimeIdentifier)\$(DeskBoxRustCrtLinkage)</DeskBoxNativeTestIntermediateDir>
+    <DeskBoxNativeTestCargoTargetDir>$(DeskBoxNativeTestIntermediateDir)\cargo-target</DeskBoxNativeTestCargoTargetDir>
+    <DeskBoxNativeTestDll>$(DeskBoxNativeTestIntermediateDir)\deskbox_native.dll</DeskBoxNativeTestDll>
+    <DeskBoxNativeTestPdb>$(DeskBoxNativeTestIntermediateDir)\deskbox_native.pdb</DeskBoxNativeTestPdb>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <DeskBoxNativeTestInput Include="$(MSBuildProjectDirectory)\..\..\rust-toolchain.toml" />
+    <DeskBoxNativeTestInput Include="$(MSBuildProjectDirectory)\..\..\native\Cargo.toml" />
+    <DeskBoxNativeTestInput Include="$(MSBuildProjectDirectory)\..\..\native\Cargo.lock" />
+    <DeskBoxNativeTestInput Include="$(MSBuildProjectDirectory)\..\..\native\deskbox-native\Cargo.toml" />
+    <DeskBoxNativeTestInput Include="$(MSBuildProjectDirectory)\..\..\native\deskbox-native\src\**\*" />
+    <DeskBoxNativeTestInput Include="$(MSBuildProjectDirectory)\..\..\native\include\deskbox_native.h" />
+    <DeskBoxNativeTestInput Include="$(MSBuildProjectDirectory)\..\..\scripts\build-rust-native.ps1" />
+    <DeskBoxNativeTestInput Include="$(MSBuildProjectDirectory)\..\..\scripts\native-pe-contract.ps1" />
+    <DeskBoxNativeTestInput Include="$(MSBuildProjectDirectory)\..\..\scripts\rust-arm64-msvc-environment.ps1" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="coverlet.collector" Version="6.0.0" />
+    <PackageReference Include="Microsoft.NET.Test.Sdk" Version="17.8.0" />
+    <PackageReference Include="xunit" Version="2.5.3" />
+    <PackageReference Include="xunit.runner.visualstudio" Version="2.5.3" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\src\DeskBox\DeskBox.csproj" />
+    <ProjectReference Include="..\..\src\DeskBox.Updater\DeskBox.Updater.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Using Include="Xunit" />
+    <Using Include="DeskBox.Platform" />
+  </ItemGroup>
+
+  <!-- Explicit migration suite while retired feature tests are being removed.
+       The default upstream suite is deliberately not silently changed. -->
+  <ItemGroup Condition="'$(NaiWaOrganizerCoreTests)' == 'true'">
+    <Compile Remove="**\*.cs" />
+    <Compile Include="NaiWaOrganizationTests.cs" />
+    <Compile Include="NaiWaRetiredFeatureMigrationTests.cs" />
+  </ItemGroup>
+
+  <Target
+    Name="BuildDeskBoxNativeTestModule"
+    BeforeTargets="CoreCompile"
+    Inputs="@(DeskBoxNativeTestInput)"
+    Outputs="$(DeskBoxNativeTestDll);$(DeskBoxNativeTestPdb)">
+    <Error
+      Condition="'$(DeskBoxRustCrtLinkage)' != 'Dynamic' and '$(DeskBoxRustCrtLinkage)' != 'Static'"
+      Text="DeskBox test Rust CRT linkage must be Dynamic or Static." />
+    <Exec
+      Command="powershell.exe -NoProfile -ExecutionPolicy Bypass -File &quot;$(MSBuildProjectDirectory)\..\..\scripts\build-rust-native.ps1&quot; -Platform $(DeskBoxNativeTestPlatform) -Configuration $(Configuration) -CrtLinkage $(DeskBoxRustCrtLinkage) -OutputDirectory &quot;$(DeskBoxNativeTestIntermediateDir)&quot; -CargoTargetDirectory &quot;$(DeskBoxNativeTestCargoTargetDir)&quot;" />
+  </Target>
+
+  <Target
+    Name="CopyDeskBoxNativeTestModule"
+    AfterTargets="Build"
+    DependsOnTargets="BuildDeskBoxNativeTestModule">
+    <Copy
+      SourceFiles="$(DeskBoxNativeTestDll);$(DeskBoxNativeTestPdb)"
+      DestinationFolder="$(OutDir)"
+      SkipUnchangedFiles="true" />
+  </Target>
+
+</Project>

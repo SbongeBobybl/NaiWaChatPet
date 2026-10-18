@@ -1,0 +1,28 @@
+{
+  "name": "relieved",
+  "emotion": "relieved",
+  "fps": 12,
+  "frameCount": 1,
+  "loop": true,
+  "priority": 16,
+  "mouthAnchor": {
+    "frame": 0,
+    "x": 180,
+    "y": 108
+  },
+  "transitionIn": "",
+  "transitionOut": "",
+  "canvas": {
+    "width": 420,
+    "height": 560
+  },
+  "groundY": 540,
+  "frames": [
+    {
+      "file": "0000.png",
+      "sha256": "596aa2f31016b6432440c2ce516f634917efa0486f1430fa1b2925ea7717c825"
+    }
+  ],
+  "reviewed": true,
+  "sourceSha256": "82d4f5b803dfb8550347c206af481af9b2b5cd6ec65a7010b54ab3a675cc300c"
+}

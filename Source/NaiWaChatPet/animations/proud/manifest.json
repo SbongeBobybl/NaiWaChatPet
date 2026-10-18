@@ -1,0 +1,28 @@
+{
+  "name": "proud",
+  "emotion": "proud",
+  "fps": 12,
+  "frameCount": 1,
+  "loop": true,
+  "priority": 22,
+  "mouthAnchor": {
+    "frame": 0,
+    "x": 180,
+    "y": 108
+  },
+  "transitionIn": "",
+  "transitionOut": "",
+  "canvas": {
+    "width": 420,
+    "height": 560
+  },
+  "groundY": 540,
+  "frames": [
+    {
+      "file": "0000.png",
+      "sha256": "9dafc8b854f8471e01742862efa9dd7a87a943e88a95e6a24d296f123b3e97de"
+    }
+  ],
+  "reviewed": true,
+  "sourceSha256": "dead555e6260be38ff8908f76b35ed002d7de7be4c3d1a9933d3c1501bf6e386"
+}

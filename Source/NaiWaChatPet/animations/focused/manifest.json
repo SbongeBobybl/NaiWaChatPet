@@ -1,0 +1,28 @@
+{
+  "name": "focused",
+  "emotion": "focused",
+  "fps": 12,
+  "frameCount": 1,
+  "loop": true,
+  "priority": 16,
+  "mouthAnchor": {
+    "frame": 0,
+    "x": 180,
+    "y": 108
+  },
+  "transitionIn": "",
+  "transitionOut": "",
+  "canvas": {
+    "width": 420,
+    "height": 560
+  },
+  "groundY": 540,
+  "frames": [
+    {
+      "file": "0000.png",
+      "sha256": "53086e3a8a295bda18a0d26138ade000966c0df2705f03ed98c88c893ca85267"
+    }
+  ],
+  "reviewed": true,
+  "sourceSha256": "47333c92802732d350bb0ef5a408e5ef2b23189181fedb9863a4d363082b35df"
+}

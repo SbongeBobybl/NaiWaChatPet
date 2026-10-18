@@ -1,0 +1,28 @@
+{
+  "name": "smug",
+  "emotion": "smug",
+  "fps": 12,
+  "frameCount": 1,
+  "loop": true,
+  "priority": 22,
+  "mouthAnchor": {
+    "frame": 0,
+    "x": 180,
+    "y": 108
+  },
+  "transitionIn": "",
+  "transitionOut": "",
+  "canvas": {
+    "width": 420,
+    "height": 560
+  },
+  "groundY": 540,
+  "frames": [
+    {
+      "file": "0000.png",
+      "sha256": "ebb6fb70bf78dd6b7f7524992b781010e315d10ebff15a3a4260347d8d7e4bc7"
+    }
+  ],
+  "reviewed": true,
+  "sourceSha256": "a7a55ea60e25b70619b026a3a9a8cc6be40a14f8030d124ab78c0bf442a28530"
+}

@@ -1,0 +1,28 @@
+{
+  "name": "shocked",
+  "emotion": "shocked",
+  "fps": 12,
+  "frameCount": 1,
+  "loop": true,
+  "priority": 28,
+  "mouthAnchor": {
+    "frame": 0,
+    "x": 180,
+    "y": 108
+  },
+  "transitionIn": "",
+  "transitionOut": "",
+  "canvas": {
+    "width": 420,
+    "height": 560
+  },
+  "groundY": 540,
+  "frames": [
+    {
+      "file": "0000.png",
+      "sha256": "804e67ac01678a9c7bc605eb337c5a61cb9289377c56b993e2e84c4a1c25043d"
+    }
+  ],
+  "reviewed": true,
+  "sourceSha256": "027841f584ddcd9207442be6d0407dddfdf0c74bb4d7063240637e05e334cadc"
+}

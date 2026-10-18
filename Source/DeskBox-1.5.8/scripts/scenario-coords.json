@@ -1,0 +1,20 @@
+{
+  "_comment": "Real screen coordinates (primary monitor, physical pixels) per scenario. Edit after locating widgets; see docs/memory-optimization-plan.md Phase 0.",
+  "stack-toggle": {
+    "open": [1282, 412],
+    "dismiss": [960, 990]
+  },
+  "capsule-toggle": {
+    "expand": [1915, 405],
+    "collapse": [1893, 356]
+  },
+  "group-scroll": {
+    "_note": "NO ACTIVE GROUP on desktop yet (all groups have 0 members) — populate wheel point after creating a test group.",
+    "wheel": [800, 300],
+    "delta": -120,
+    "ticks": 2
+  },
+  "appearance-switch": {
+    "note": "manual mode only"
+  }
+}

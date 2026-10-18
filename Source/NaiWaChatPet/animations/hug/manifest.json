@@ -1,0 +1,28 @@
+{
+  "name": "hug",
+  "emotion": "hug",
+  "fps": 12,
+  "frameCount": 1,
+  "loop": true,
+  "priority": 22,
+  "mouthAnchor": {
+    "frame": 0,
+    "x": 180,
+    "y": 108
+  },
+  "transitionIn": "",
+  "transitionOut": "",
+  "canvas": {
+    "width": 420,
+    "height": 560
+  },
+  "groundY": 540,
+  "frames": [
+    {
+      "file": "0000.png",
+      "sha256": "97e0757a9f08470bed2e010a3b0c6cdf4ec0793adc1d36298c6914f0bafd72dc"
+    }
+  ],
+  "reviewed": true,
+  "sourceSha256": "f8e488f76ba826f853bc15aa53b31235f02e5ed8aea7ed89ea4aca44eceb1340"
+}

@@ -1,0 +1,52 @@
+name: Bug report
+description: Something does not work as expected.
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Tip: the in-app **Feedback** entry can attach a privacy-filtered diagnostics package (sanitized log tail + environment info) — that is usually the fastest path to a fix. A GitHub issue works too; this template helps you include what matters.
+
+        提示：应用内「反馈」入口可附带脱敏后的诊断包（脱敏日志尾部 + 环境信息），通常是修复最快的路径。GitHub Issue 也可以；此模板帮助你写清关键信息。
+  - type: input
+    id: version
+    attributes:
+      label: DeskBox version
+      description: Settings → About · 设置 → 关于
+      placeholder: "e.g. 1.5.5"
+    validations:
+      required: true
+  - type: dropdown
+    id: os
+    attributes:
+      label: Windows version
+      options:
+        - Windows 11
+        - Windows 10
+    validations:
+      required: true
+  - type: dropdown
+    id: arch
+    attributes:
+      label: Architecture
+      options:
+        - x64
+        - ARM64
+        - Not sure
+    validations:
+      required: true
+  - type: textarea
+    id: what-happened
+    attributes:
+      label: What happened?
+      description: What did you do, what did you expect, and what happened instead? Screenshots help. · 你做了什么操作，期望什么结果，实际发生了什么？截图有帮助。
+      placeholder: "Steps: 1. … 2. …  Expected: …  Actual: …"
+    validations:
+      required: true
+  - type: textarea
+    id: context
+    attributes:
+      label: Additional context
+      description: Anything else that might matter — other running tools, recent updates, whether it always reproduces. · 其他可能有用的信息——常驻软件、最近升级、是否必现。
+    validations:
+      required: false

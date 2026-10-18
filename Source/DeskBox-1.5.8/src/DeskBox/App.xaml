@@ -1,0 +1,522 @@
+<?xml version="1.0" encoding="utf-8"?>
+<Application
+    x:Class="DeskBox.App"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:helpers="using:DeskBox.Helpers"
+    xmlns:toolkit="using:CommunityToolkit.WinUI.Controls">
+
+    <Application.Resources>
+        <ResourceDictionary>
+            <ResourceDictionary.MergedDictionaries>
+                <XamlControlsResources xmlns="using:Microsoft.UI.Xaml.Controls" />
+                <ResourceDictionary Source="ms-appx:///CommunityToolkit.WinUI.Controls.Segmented/Segmented/Segmented.xaml" />
+            </ResourceDictionary.MergedDictionaries>
+
+            <ResourceDictionary.ThemeDictionaries>
+                <ResourceDictionary x:Key="Light">
+                    <SolidColorBrush x:Key="WidgetDragHandleBrush" Color="#6B6B6B" />
+                    <SolidColorBrush x:Key="WidgetOverlaySurfaceBrush" Color="#FBFCFD" />
+                    <SolidColorBrush x:Key="WidgetOverlayInputSurfaceBrush" Color="#FFFFFF" />
+                    <SolidColorBrush x:Key="WidgetOverlayStrokeBrush" Color="#24000000" />
+                    <SolidColorBrush x:Key="WidgetLayerFillSecondaryBrush" Color="#70FFFFFF" />
+                    <SolidColorBrush x:Key="WidgetLayerStrokeBrush" Color="#16000000" />
+                    <!-- Code-resolved neutral interaction tones. WinUI's themed
+                         tokens cannot be resolved by element theme from code
+                         (an application-scope lookup follows the system theme,
+                         not the window's override), so the palette is mirrored
+                         here and resolved by element ActualTheme. Values mirror
+                         SubtleFillColorSecondary/Tertiary,
+                         ControlStrongStrokeColorDefault and
+                         TextFillColorPrimary. -->
+                    <SolidColorBrush x:Key="DeskBoxNeutralFillSecondaryBrush" Color="#09000000" />
+                    <SolidColorBrush x:Key="DeskBoxNeutralFillTertiaryBrush" Color="#06000000" />
+                    <SolidColorBrush x:Key="DeskBoxNeutralLineBrush" Color="#72000000" />
+                    <SolidColorBrush x:Key="DeskBoxNeutralTextPrimaryBrush" Color="#E4000000" />
+                    <CornerRadius x:Key="OverlayCornerRadius">8</CornerRadius>
+                    <CornerRadius x:Key="ComboBoxItemCornerRadius">6</CornerRadius>
+                    <CornerRadius x:Key="ComboBoxHiglightBorderCornerRadius">8</CornerRadius>
+                    <CornerRadius x:Key="ComboBoxDropDownButtonBackgroundCornerRadius">6</CornerRadius>
+                    <Thickness x:Key="ComboBoxDropdownBorderThickness">1</Thickness>
+                    <Thickness x:Key="ComboBoxDropdownBorderPadding">0</Thickness>
+                    <Thickness x:Key="ComboBoxDropdownContentMargin">4</Thickness>
+                </ResourceDictionary>
+                <ResourceDictionary x:Key="Dark">
+                    <SolidColorBrush x:Key="WidgetDragHandleBrush" Color="#D6D6D6" />
+                    <SolidColorBrush x:Key="WidgetOverlaySurfaceBrush" Color="#2A3038" />
+                    <SolidColorBrush x:Key="WidgetOverlayInputSurfaceBrush" Color="#222830" />
+                    <SolidColorBrush x:Key="WidgetOverlayStrokeBrush" Color="#52FFFFFF" />
+                    <SolidColorBrush x:Key="WidgetLayerFillSecondaryBrush" Color="#0DFFFFFF" />
+                    <SolidColorBrush x:Key="WidgetLayerStrokeBrush" Color="#20FFFFFF" />
+                    <SolidColorBrush x:Key="DeskBoxNeutralFillSecondaryBrush" Color="#0FFFFFFF" />
+                    <SolidColorBrush x:Key="DeskBoxNeutralFillTertiaryBrush" Color="#0AFFFFFF" />
+                    <SolidColorBrush x:Key="DeskBoxNeutralLineBrush" Color="#8BFFFFFF" />
+                    <SolidColorBrush x:Key="DeskBoxNeutralTextPrimaryBrush" Color="#FFFFFFFF" />
+                    <CornerRadius x:Key="OverlayCornerRadius">8</CornerRadius>
+                    <CornerRadius x:Key="ComboBoxItemCornerRadius">6</CornerRadius>
+                    <CornerRadius x:Key="ComboBoxHiglightBorderCornerRadius">8</CornerRadius>
+                    <CornerRadius x:Key="ComboBoxDropDownButtonBackgroundCornerRadius">6</CornerRadius>
+                    <Thickness x:Key="ComboBoxDropdownBorderThickness">1</Thickness>
+                    <Thickness x:Key="ComboBoxDropdownBorderPadding">0</Thickness>
+                    <Thickness x:Key="ComboBoxDropdownContentMargin">4</Thickness>
+                </ResourceDictionary>
+                <!-- Fallback theme dictionary (WinUI convention keeps dark
+                     values in Default). Light/Dark resolve first, so this is
+                     inert outside high contrast; HighContrast below owns the
+                     system-owned contrast mapping. -->
+                <ResourceDictionary x:Key="Default">
+                    <SolidColorBrush x:Key="WidgetDragHandleBrush" Color="#D6D6D6" />
+                    <SolidColorBrush x:Key="WidgetOverlaySurfaceBrush" Color="#2A3038" />
+                    <SolidColorBrush x:Key="WidgetOverlayInputSurfaceBrush" Color="#222830" />
+                    <SolidColorBrush x:Key="WidgetOverlayStrokeBrush" Color="#52FFFFFF" />
+                    <SolidColorBrush x:Key="WidgetLayerFillSecondaryBrush" Color="#0DFFFFFF" />
+                    <SolidColorBrush x:Key="WidgetLayerStrokeBrush" Color="#20FFFFFF" />
+                    <SolidColorBrush x:Key="DeskBoxNeutralFillSecondaryBrush" Color="#0FFFFFFF" />
+                    <SolidColorBrush x:Key="DeskBoxNeutralFillTertiaryBrush" Color="#0AFFFFFF" />
+                    <SolidColorBrush x:Key="DeskBoxNeutralLineBrush" Color="#8BFFFFFF" />
+                    <SolidColorBrush x:Key="DeskBoxNeutralTextPrimaryBrush" Color="#FFFFFFFF" />
+                    <CornerRadius x:Key="OverlayCornerRadius">8</CornerRadius>
+                    <CornerRadius x:Key="ComboBoxItemCornerRadius">6</CornerRadius>
+                    <CornerRadius x:Key="ComboBoxHiglightBorderCornerRadius">8</CornerRadius>
+                    <CornerRadius x:Key="ComboBoxDropDownButtonBackgroundCornerRadius">6</CornerRadius>
+                    <Thickness x:Key="ComboBoxDropdownBorderThickness">1</Thickness>
+                    <Thickness x:Key="ComboBoxDropdownBorderPadding">0</Thickness>
+                    <Thickness x:Key="ComboBoxDropdownContentMargin">4</Thickness>
+                </ResourceDictionary>
+                <!-- High contrast stays system-owned: RequestedTheme is ignored
+                     by the framework under high contrast, so the widget windows
+                     and search popup resolve these keys against the system
+                     contrast palette. Without this dictionary the lookup chain
+                     (HighContrast -> Default at the time it was authored) found
+                     nothing and ThemeResource resolution failed at parse time.
+                     Overlay/layer surfaces map to the system window color
+                     (readable solid base — every consumer is a container
+                     background, nothing peeks through); strokes and handles map
+                     to the system window text color; the code-resolved
+                     DeskBoxNeutral washes map to Transparent. The DeskBoxNeutral*
+                     entries are inert here today: they are resolved from code by
+                     element ActualTheme (Light/Dark only) and are mirrored
+                     solely to keep the four dictionaries' key sets identical. -->
+                <ResourceDictionary x:Key="HighContrast">
+                    <SolidColorBrush x:Key="WidgetDragHandleBrush" Color="{ThemeResource SystemColorWindowTextColor}" />
+                    <SolidColorBrush x:Key="WidgetOverlaySurfaceBrush" Color="{ThemeResource SystemColorWindowColor}" />
+                    <SolidColorBrush x:Key="WidgetOverlayInputSurfaceBrush" Color="{ThemeResource SystemColorWindowColor}" />
+                    <SolidColorBrush x:Key="WidgetOverlayStrokeBrush" Color="{ThemeResource SystemColorWindowTextColor}" />
+                    <SolidColorBrush x:Key="WidgetLayerFillSecondaryBrush" Color="{ThemeResource SystemColorWindowColor}" />
+                    <SolidColorBrush x:Key="WidgetLayerStrokeBrush" Color="{ThemeResource SystemColorWindowTextColor}" />
+                    <SolidColorBrush x:Key="DeskBoxNeutralFillSecondaryBrush" Color="Transparent" />
+                    <SolidColorBrush x:Key="DeskBoxNeutralFillTertiaryBrush" Color="Transparent" />
+                    <SolidColorBrush x:Key="DeskBoxNeutralLineBrush" Color="{ThemeResource SystemColorWindowTextColor}" />
+                    <SolidColorBrush x:Key="DeskBoxNeutralTextPrimaryBrush" Color="{ThemeResource SystemColorWindowTextColor}" />
+                    <CornerRadius x:Key="OverlayCornerRadius">8</CornerRadius>
+                    <CornerRadius x:Key="ComboBoxItemCornerRadius">6</CornerRadius>
+                    <CornerRadius x:Key="ComboBoxHiglightBorderCornerRadius">8</CornerRadius>
+                    <CornerRadius x:Key="ComboBoxDropDownButtonBackgroundCornerRadius">6</CornerRadius>
+                    <Thickness x:Key="ComboBoxDropdownBorderThickness">1</Thickness>
+                    <Thickness x:Key="ComboBoxDropdownBorderPadding">0</Thickness>
+                    <Thickness x:Key="ComboBoxDropdownContentMargin">4</Thickness>
+                </ResourceDictionary>
+            </ResourceDictionary.ThemeDictionaries>
+
+            <!-- DeskBox visual language: three radii. -->
+            <CornerRadius x:Key="WidgetCornerRadiusSmall">4</CornerRadius>
+            <CornerRadius x:Key="WidgetCornerRadiusMedium">6</CornerRadius>
+            <CornerRadius x:Key="WidgetCornerRadiusLarge">8</CornerRadius>
+            <x:Double x:Key="WidgetTitleTextSize">14</x:Double>
+
+            <FontFamily x:Key="DeskBoxMenuFontFamily">Microsoft YaHei UI, Segoe UI Variable, Segoe UI</FontFamily>
+            <x:Double x:Key="DeskBoxMenuItemMinHeight">36</x:Double>
+            <x:Double x:Key="DeskBoxMenuItemFontSize">13</x:Double>
+            <Thickness x:Key="DeskBoxMenuPresenterPadding">0,4,0,4</Thickness>
+            <Thickness x:Key="DeskBoxMenuItemPadding">10,8,10,8</Thickness>
+
+            <Style x:Key="WidgetTitleActionButtonStyle" TargetType="Button" BasedOn="{StaticResource DefaultButtonStyle}">
+                <Setter Property="Width" Value="24" />
+                <Setter Property="Height" Value="24" />
+                <Setter Property="MinWidth" Value="24" />
+                <Setter Property="MinHeight" Value="24" />
+                <Setter Property="Padding" Value="0" />
+                <Setter Property="Background" Value="Transparent" />
+                <Setter Property="BorderBrush" Value="Transparent" />
+                <Setter Property="BorderThickness" Value="0" />
+                <Setter Property="CornerRadius" Value="{StaticResource WidgetCornerRadiusSmall}" />
+                <Setter Property="UseSystemFocusVisuals" Value="True" />
+            </Style>
+
+            <!-- Anchor badge for svc:InfoTip explanation flyouts. Attached to
+                 SettingsCard/SettingsExpander elements; the badge button is
+                 manufactured by InfoTip.CreateAnchorButton and shown beside
+                 the card header text. Quiet by design: neutral translucent
+                 fill + secondary text color (subtler than the header), 13px
+                 circle, Segoe Fluent "?" glyph; hover softens via opacity. -->
+            <Style x:Key="InfoTipButtonStyle" TargetType="Button">
+                <Setter Property="Width" Value="16" />
+                <Setter Property="Height" Value="16" />
+                <Setter Property="MinWidth" Value="16" />
+                <Setter Property="MinHeight" Value="16" />
+                <Setter Property="Padding" Value="0" />
+                <Setter Property="CornerRadius" Value="8" />
+                <Setter Property="UseSystemFocusVisuals" Value="True" />
+                <Setter Property="Background" Value="{ThemeResource ControlFillColorDefaultBrush}" />
+                <Setter Property="Foreground" Value="{ThemeResource TextFillColorSecondaryBrush}" />
+                <Setter Property="Template">
+                    <Setter.Value>
+                        <ControlTemplate TargetType="Button">
+                            <Grid
+                                x:Name="Root"
+                                Background="{TemplateBinding Background}"
+                                CornerRadius="8">
+                                <ContentPresenter
+                                    HorizontalAlignment="Center"
+                                    VerticalAlignment="Center" />
+                                <VisualStateManager.VisualStateGroups>
+                                    <VisualStateGroup x:Name="CommonStates">
+                                        <VisualState x:Name="Normal" />
+                                        <VisualState x:Name="PointerOver">
+                                            <Storyboard>
+                                                <DoubleAnimation
+                                                    Storyboard.TargetName="Root"
+                                                    Storyboard.TargetProperty="Opacity"
+                                                    To="0.8"
+                                                    Duration="0:0:0.08" />
+                                            </Storyboard>
+                                        </VisualState>
+                                        <VisualState x:Name="Pressed">
+                                            <Storyboard>
+                                                <DoubleAnimation
+                                                    Storyboard.TargetName="Root"
+                                                    Storyboard.TargetProperty="Opacity"
+                                                    To="0.65"
+                                                    Duration="0:0:0.04" />
+                                            </Storyboard>
+                                        </VisualState>
+                                    </VisualStateGroup>
+                                </VisualStateManager.VisualStateGroups>
+                            </Grid>
+                        </ControlTemplate>
+                    </Setter.Value>
+                </Setter>
+            </Style>
+
+            <!-- Shared ToggleSwitch template tuning for settings-style rows. -->
+            <x:Double x:Key="ToggleSwitchOuterBorderStrokeThickness">0.25</x:Double>
+            <x:Double x:Key="ToggleSwitchThemeMinWidth">72</x:Double>
+            <x:Double x:Key="ToggleSwitchPreContentMargin">0</x:Double>
+            <x:Double x:Key="ToggleSwitchPostContentMargin">0</x:Double>
+
+            <Style TargetType="ToggleSwitch" BasedOn="{StaticResource DefaultToggleSwitchStyle}">
+                <Setter Property="HorizontalAlignment" Value="Right" />
+                <Setter Property="VerticalAlignment" Value="Center" />
+                <Setter Property="Margin" Value="0" />
+            </Style>
+
+            <Style x:Key="WidgetEmptyStatePanelStyle" TargetType="StackPanel">
+                <Setter Property="MaxWidth" Value="220" />
+                <Setter Property="HorizontalAlignment" Value="Center" />
+                <Setter Property="VerticalAlignment" Value="Center" />
+                <Setter Property="Spacing" Value="6" />
+            </Style>
+
+            <Style x:Key="WidgetEmptyStateIconStyle" TargetType="FontIcon">
+                <Setter Property="HorizontalAlignment" Value="Center" />
+            </Style>
+
+            <!-- Every TextBlock opts into the widget text shadow. Only the
+                 application resources reach text expanded from data and
+                 control templates; WidgetTextShadow ignores texts outside
+                 windows marked with WidgetTextShadow.Scope and does nothing
+                 while the setting is off. -->
+            <Style TargetType="TextBlock">
+                <Setter Property="helpers:WidgetTextShadow.Cast" Value="True" />
+            </Style>
+
+            <Style x:Key="WidgetEmptyStateTitleTextStyle" TargetType="TextBlock">
+                <Setter Property="HorizontalAlignment" Value="Center" />
+                <Setter Property="TextAlignment" Value="Center" />
+                <Setter Property="TextTrimming" Value="CharacterEllipsis" />
+                <Setter Property="TextWrapping" Value="Wrap" />
+            </Style>
+
+            <Style x:Key="WidgetEmptyStateDescriptionTextStyle" TargetType="TextBlock">
+                <Setter Property="MaxWidth" Value="220" />
+                <Setter Property="HorizontalAlignment" Value="Center" />
+                <Setter Property="Foreground" Value="{ThemeResource TextFillColorSecondaryBrush}" />
+                <Setter Property="TextAlignment" Value="Center" />
+                <Setter Property="TextTrimming" Value="CharacterEllipsis" />
+                <Setter Property="TextWrapping" Value="Wrap" />
+            </Style>
+
+            <Style TargetType="MenuFlyoutPresenter" BasedOn="{StaticResource DefaultMenuFlyoutPresenterStyle}">
+                <Setter Property="FontFamily" Value="{StaticResource DeskBoxMenuFontFamily}" />
+                <Setter Property="Padding" Value="{StaticResource DeskBoxMenuPresenterPadding}" />
+            </Style>
+
+            <Style TargetType="MenuFlyoutItem" BasedOn="{StaticResource DefaultMenuFlyoutItemStyle}">
+                <Setter Property="FontFamily" Value="{StaticResource DeskBoxMenuFontFamily}" />
+                <Setter Property="MinHeight" Value="{StaticResource DeskBoxMenuItemMinHeight}" />
+                <Setter Property="Padding" Value="{StaticResource DeskBoxMenuItemPadding}" />
+                <Setter Property="FontSize" Value="{StaticResource DeskBoxMenuItemFontSize}" />
+            </Style>
+
+            <Style TargetType="ToggleMenuFlyoutItem" BasedOn="{StaticResource DefaultToggleMenuFlyoutItemStyle}">
+                <Setter Property="FontFamily" Value="{StaticResource DeskBoxMenuFontFamily}" />
+                <Setter Property="MinHeight" Value="{StaticResource DeskBoxMenuItemMinHeight}" />
+                <Setter Property="Padding" Value="{StaticResource DeskBoxMenuItemPadding}" />
+                <Setter Property="FontSize" Value="{StaticResource DeskBoxMenuItemFontSize}" />
+            </Style>
+
+            <Style TargetType="MenuFlyoutSubItem" BasedOn="{StaticResource DefaultMenuFlyoutSubItemStyle}">
+                <Setter Property="FontFamily" Value="{StaticResource DeskBoxMenuFontFamily}" />
+                <Setter Property="MinHeight" Value="{StaticResource DeskBoxMenuItemMinHeight}" />
+                <Setter Property="Padding" Value="{StaticResource DeskBoxMenuItemPadding}" />
+                <Setter Property="FontSize" Value="{StaticResource DeskBoxMenuItemFontSize}" />
+            </Style>
+
+            <!-- Custom styles to override missing system styles in some environments -->
+            <Style x:Key="SubtleButtonStyle" TargetType="Button" BasedOn="{StaticResource DefaultButtonStyle}">
+                <Setter Property="Background" Value="Transparent" />
+                <Setter Property="BorderBrush" Value="Transparent" />
+                <Setter Property="UseSystemFocusVisuals" Value="True" />
+            </Style>
+
+            <!-- Shared widget content surface tokens. -->
+            <Style x:Key="WidgetItemActionButtonStyle" TargetType="Button" BasedOn="{StaticResource SubtleButtonStyle}">
+                <Setter Property="Width" Value="26" />
+                <Setter Property="Height" Value="26" />
+                <Setter Property="MinWidth" Value="26" />
+                <Setter Property="MinHeight" Value="26" />
+                <Setter Property="Padding" Value="0" />
+                <Setter Property="BorderThickness" Value="0" />
+                <Setter Property="CornerRadius" Value="6" />
+            </Style>
+
+            <Style x:Key="WidgetEditorCommandButtonStyle" TargetType="Button" BasedOn="{StaticResource DefaultButtonStyle}">
+                <Setter Property="MinWidth" Value="58" />
+                <Setter Property="Padding" Value="10,3" />
+                <Setter Property="CornerRadius" Value="6" />
+            </Style>
+
+            <Style x:Key="WidgetInlineEditorCloseButtonStyle" TargetType="Button" BasedOn="{StaticResource SubtleButtonStyle}">
+                <Setter Property="Width" Value="24" />
+                <Setter Property="Height" Value="24" />
+                <Setter Property="MinWidth" Value="24" />
+                <Setter Property="MinHeight" Value="24" />
+                <Setter Property="Padding" Value="0" />
+                <Setter Property="BorderThickness" Value="0" />
+                <Setter Property="CornerRadius" Value="5" />
+            </Style>
+
+            <Style x:Key="WidgetTextInputStyle" TargetType="TextBox" BasedOn="{StaticResource DefaultTextBoxStyle}">
+                <Setter Property="MinHeight" Value="30" />
+                <Setter Property="Padding" Value="8,4" />
+                <Setter Property="BorderThickness" Value="1" />
+                <Setter Property="HorizontalContentAlignment" Value="Left" />
+                <Setter Property="VerticalContentAlignment" Value="Center" />
+            </Style>
+
+            <Style x:Key="WidgetCompactInputTextBoxStyle" TargetType="TextBox" BasedOn="{StaticResource WidgetTextInputStyle}">
+                <Setter Property="VerticalContentAlignment" Value="Center" />
+                <Setter Property="TextWrapping" Value="NoWrap" />
+            </Style>
+
+            <Style x:Key="WidgetBorderlessInputTextBoxStyle" TargetType="TextBox" BasedOn="{StaticResource WidgetCompactInputTextBoxStyle}">
+                <Setter Property="BorderThickness" Value="0" />
+                <Setter Property="TextWrapping" Value="Wrap" />
+            </Style>
+
+            <Style x:Key="WidgetSearchTextBoxStyle" TargetType="TextBox" BasedOn="{StaticResource WidgetCompactInputTextBoxStyle}">
+                <Setter Property="BorderThickness" Value="1" />
+            </Style>
+
+            <Style x:Key="WidgetCompactIconButtonStyle" TargetType="Button" BasedOn="{StaticResource SubtleButtonStyle}">
+                <Setter Property="Padding" Value="0" />
+                <Setter Property="BorderThickness" Value="0" />
+                <Setter Property="CornerRadius" Value="5" />
+            </Style>
+
+            <Style x:Key="WidgetInlineRenameTextBoxStyle" TargetType="TextBox" BasedOn="{StaticResource DefaultTextBoxStyle}">
+                <Setter Property="MinWidth" Value="0" />
+                <Setter Property="MinHeight" Value="0" />
+                <Setter Property="Padding" Value="2,0" />
+                <Setter Property="TextWrapping" Value="NoWrap" />
+                <Setter Property="BorderThickness" Value="1" />
+                <!-- The inline rename box is an active edit surface, so its
+                     border is the neutral strong stroke rather than the accent. -->
+                <Setter Property="BorderBrush" Value="{ThemeResource ControlStrongStrokeColorDefaultBrush}" />
+                <Setter Property="Background" Value="Transparent" />
+                <Setter Property="CornerRadius" Value="2" />
+            </Style>
+
+            <Style x:Key="WidgetTitleRenameTextBoxStyle" TargetType="TextBox" BasedOn="{StaticResource WidgetInlineRenameTextBoxStyle}">
+                <Setter Property="MinHeight" Value="28" />
+                <Setter Property="Padding" Value="8,2" />
+            </Style>
+
+            <Style x:Key="WidgetEditorTextBoxStyle" TargetType="TextBox" BasedOn="{StaticResource WidgetTextInputStyle}">
+                <Setter Property="AcceptsReturn" Value="True" />
+                <Setter Property="Background" Value="{ThemeResource WidgetOverlayInputSurfaceBrush}" />
+                <Setter Property="BorderBrush" Value="{ThemeResource WidgetOverlayStrokeBrush}" />
+                <Setter Property="MinHeight" Value="0" />
+                <Setter Property="Padding" Value="8,6" />
+                <Setter Property="TextWrapping" Value="Wrap" />
+                <Setter Property="VerticalAlignment" Value="Stretch" />
+                <Setter Property="VerticalContentAlignment" Value="Top" />
+                <Setter Property="ScrollViewer.VerticalScrollBarVisibility" Value="Auto" />
+            </Style>
+
+            <Style x:Key="WidgetInlineEditorOverlayStyle" TargetType="Border">
+                <Setter Property="Padding" Value="10" />
+                <Setter Property="Background" Value="{ThemeResource WidgetOverlaySurfaceBrush}" />
+                <Setter Property="BorderBrush" Value="{ThemeResource WidgetOverlayStrokeBrush}" />
+                <Setter Property="BorderThickness" Value="0.8" />
+                <Setter Property="CornerRadius" Value="8" />
+            </Style>
+
+            <Style x:Key="WidgetInlineEditorTitleTextStyle" TargetType="TextBlock">
+                <Setter Property="FontWeight" Value="SemiBold" />
+                <Setter Property="TextTrimming" Value="CharacterEllipsis" />
+                <Setter Property="VerticalAlignment" Value="Center" />
+                <!-- Explicitly styled text bypasses the implicit Cast style;
+                     without this setter the inline-editor titles render
+                     without the widget text shadow. -->
+                <Setter Property="helpers:WidgetTextShadow.Cast" Value="True" />
+            </Style>
+
+            <Style x:Key="WidgetConfirmCommandButtonStyle" TargetType="Button" BasedOn="{StaticResource DefaultButtonStyle}">
+                <Setter Property="MinWidth" Value="62" />
+                <Setter Property="Padding" Value="10,4" />
+                <Setter Property="CornerRadius" Value="6" />
+            </Style>
+
+            <Style x:Key="WidgetToastActionButtonStyle" TargetType="Button" BasedOn="{StaticResource DefaultButtonStyle}">
+                <Setter Property="MinWidth" Value="0" />
+                <Setter Property="Padding" Value="8,2" />
+            </Style>
+
+            <!-- Applied at runtime by WidgetSegmentedStyleHelper for the "Pivot"
+                 tab style; each Segmented keeps its MinHeight/FontSize bindings
+                 inline, so this style carries no runtime bindings. -->
+            <Style x:Key="WidgetPivotSegmentedStyle" TargetType="toolkit:Segmented" BasedOn="{StaticResource PivotSegmentedStyle}">
+                <Setter Property="HorizontalAlignment" Value="Stretch" />
+            </Style>
+
+            <Style x:Key="WidgetRowHoverBackgroundStyle" TargetType="Border">
+                <Setter Property="Margin" Value="-4,-3,-2,-3" />
+                <Setter Property="Background" Value="Transparent" />
+                <Setter Property="CornerRadius" Value="7" />
+                <Setter Property="Opacity" Value="0" />
+            </Style>
+
+            <Style x:Key="WidgetHoverActionHostStyle" TargetType="Border">
+                <Setter Property="Background" Value="{ThemeResource SolidBackgroundFillColorBaseBrush}" />
+                <Setter Property="CornerRadius" Value="6" />
+                <Setter Property="IsHitTestVisible" Value="False" />
+                <Setter Property="Opacity" Value="0" />
+            </Style>
+
+            <Style x:Key="WidgetCompactToastStyle" TargetType="Border">
+                <Setter Property="Padding" Value="10,6" />
+                <Setter Property="HorizontalAlignment" Value="Center" />
+                <Setter Property="VerticalAlignment" Value="Bottom" />
+                <Setter Property="Background" Value="{ThemeResource SystemControlAcrylicElementBrush}" />
+                <Setter Property="BorderBrush" Value="{ThemeResource CardStrokeColorDefaultBrush}" />
+                <Setter Property="BorderThickness" Value="1" />
+                <Setter Property="CornerRadius" Value="6" />
+                <Setter Property="IsHitTestVisible" Value="False" />
+                <Setter Property="Opacity" Value="0" />
+            </Style>
+
+            <!--
+                Shared visual template for Toolkit GridSplitter. Toolkit 8.2
+                projects SizerBase as Control, so the
+                keyed base-Control template keeps the native resize behavior
+                while avoiding the incompatible implicit style.
+            -->
+            <Style x:Key="WidgetMasterDetailSplitterStyle" TargetType="Control">
+                <Setter Property="IsTabStop" Value="True" />
+                <Setter Property="UseSystemFocusVisuals" Value="True" />
+                <Setter Property="IsFocusEngagementEnabled" Value="True" />
+                <Setter Property="MinHeight" Value="8" />
+                <Setter Property="MinWidth" Value="8" />
+                <Setter Property="Padding" Value="0" />
+                <Setter Property="Foreground" Value="{ThemeResource ControlStrongFillColorDefaultBrush}" />
+                <Setter Property="Background" Value="Transparent" />
+                <Setter Property="HorizontalContentAlignment" Value="Center" />
+                <Setter Property="VerticalContentAlignment" Value="Center" />
+                <Setter Property="ManipulationMode" Value="TranslateX" />
+                <Setter Property="Template">
+                    <Setter.Value>
+                        <ControlTemplate TargetType="Control">
+                            <Grid
+                                x:Name="SplitterRoot"
+                                Background="{TemplateBinding Background}"
+                                CornerRadius="{TemplateBinding CornerRadius}">
+                                <Grid.BackgroundTransition>
+                                    <BrushTransition Duration="0:0:0.083" />
+                                </Grid.BackgroundTransition>
+                                <VisualStateManager.VisualStateGroups>
+                                    <VisualStateGroup x:Name="CommonStates">
+                                        <VisualState x:Name="Normal" />
+                                        <VisualState x:Name="PointerOver">
+                                            <VisualState.Setters>
+                                                <Setter Target="SplitterHoverTrack.Background" Value="{ThemeResource ControlAltFillColorTertiaryBrush}" />
+                                            </VisualState.Setters>
+                                        </VisualState>
+                                        <VisualState x:Name="Pressed">
+                                            <VisualState.Setters>
+                                                <Setter Target="SplitterHoverTrack.Background" Value="{ThemeResource ControlAltFillColorQuarternaryBrush}" />
+                                            </VisualState.Setters>
+                                        </VisualState>
+                                        <VisualState x:Name="Disabled">
+                                            <VisualState.Setters>
+                                                <Setter Target="SplitterThumb.Opacity" Value="0.45" />
+                                            </VisualState.Setters>
+                                        </VisualState>
+                                    </VisualStateGroup>
+                                    <VisualStateGroup x:Name="OrientationStates">
+                                        <VisualState x:Name="Vertical" />
+                                        <VisualState x:Name="Horizontal">
+                                            <VisualState.Setters>
+                                                <Setter Target="SplitterHoverTrack.Width" Value="72" />
+                                                <Setter Target="SplitterHoverTrack.Height" Value="4" />
+                                                <Setter Target="SplitterHoverTrack.CornerRadius" Value="2" />
+                                                <Setter Target="SplitterThumb.Width" Value="64" />
+                                                <Setter Target="SplitterThumb.Height" Value="2" />
+                                                <Setter Target="SplitterThumb.RadiusX" Value="1" />
+                                                <Setter Target="SplitterThumb.RadiusY" Value="1" />
+                                            </VisualState.Setters>
+                                        </VisualState>
+                                    </VisualStateGroup>
+                                    <VisualStateGroup x:Name="ThumbVisibilityStates">
+                                        <VisualState x:Name="Visible" />
+                                        <VisualState x:Name="Collapsed">
+                                            <VisualState.Setters>
+                                                <Setter Target="SplitterThumb.Visibility" Value="Collapsed" />
+                                            </VisualState.Setters>
+                                        </VisualState>
+                                    </VisualStateGroup>
+                                </VisualStateManager.VisualStateGroups>
+                                <Border
+                                    x:Name="SplitterHoverTrack"
+                                    Width="4"
+                                    HorizontalAlignment="Center"
+                                    Background="Transparent"
+                                    CornerRadius="2">
+                                    <Rectangle
+                                        x:Name="SplitterThumb"
+                                        Width="2"
+                                        Height="24"
+                                        HorizontalAlignment="Center"
+                                        Fill="{TemplateBinding Foreground}"
+                                        RadiusX="1"
+                                        RadiusY="1" />
+                                </Border>
+                            </Grid>
+                        </ControlTemplate>
+                    </Setter.Value>
+                </Setter>
+            </Style>
+        </ResourceDictionary>
+    </Application.Resources>
+
+</Application>

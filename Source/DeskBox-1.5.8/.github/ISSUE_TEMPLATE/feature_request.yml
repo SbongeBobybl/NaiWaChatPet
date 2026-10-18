@@ -1,0 +1,27 @@
+name: Feature request
+description: Suggest an idea or improvement.
+labels: ["enhancement"]
+body:
+  - type: textarea
+    id: problem
+    attributes:
+      label: What problem are you trying to solve?
+      description: Describe the task or annoyance, not the solution yet. · 先描述你想完成的任务或困扰，而不是解决方案。
+      placeholder: "When I …, it is hard to …"
+    validations:
+      required: true
+  - type: textarea
+    id: solution
+    attributes:
+      label: What would help?
+      description: Your idea of the solution, if you have one. Alternative approaches you considered are welcome too. · 你的设想方案（如果有），也欢迎写下你考虑过的替代做法。
+    validations:
+      required: true
+  - type: input
+    id: version
+    attributes:
+      label: DeskBox version (if relevant)
+      description: Settings → About · 设置 → 关于
+      placeholder: "e.g. 1.5.5"
+    validations:
+      required: false

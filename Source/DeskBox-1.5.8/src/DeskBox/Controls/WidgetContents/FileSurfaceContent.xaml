@@ -1,0 +1,1060 @@
+<?xml version="1.0" encoding="utf-8"?>
+<UserControl
+    x:Class="DeskBox.Controls.WidgetContents.FileSurfaceContent"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:helpers="using:DeskBox.Helpers"
+    xmlns:controls="using:DeskBox.Controls"
+    xmlns:svc="using:DeskBox.Services"
+    xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+    xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+    Foreground="{ThemeResource TextFillColorPrimaryBrush}"
+    Loaded="FileSurfaceContent_TextScaleLoaded"
+    Unloaded="FileSurfaceContent_TextScaleUnloaded"
+    mc:Ignorable="d">
+
+    <UserControl.Resources>
+        <Style x:Key="FileIconLoadingPlaceholderStyle" TargetType="ContentControl">
+            <Setter Property="HorizontalAlignment" Value="Center" />
+            <Setter Property="VerticalAlignment" Value="Center" />
+            <Setter Property="IsHitTestVisible" Value="False" />
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="ContentControl">
+                        <Viewbox Stretch="Uniform">
+                            <Grid Width="36" Height="36">
+                                <Border
+                                    Background="{ThemeResource SubtleFillColorSecondaryBrush}"
+                                    BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}"
+                                    BorderThickness="1"
+                                    CornerRadius="9"
+                                    Opacity="0.62" />
+                            </Grid>
+                        </Viewbox>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
+        <Style x:Key="SurfaceGridViewItemStyle" TargetType="GridViewItem">
+            <Setter Property="Padding" Value="0" />
+            <Setter Property="Margin" Value="0" />
+            <Setter Property="MinWidth" Value="0" />
+            <Setter Property="MinHeight" Value="0" />
+            <Setter Property="CanDrag" Value="True" />
+            <Setter Property="UseSystemFocusVisuals" Value="True" />
+            <Setter Property="Background" Value="Transparent" />
+            <Setter Property="BorderBrush" Value="Transparent" />
+            <Setter Property="BorderThickness" Value="0" />
+            <Setter Property="HorizontalContentAlignment" Value="Stretch" />
+            <Setter Property="VerticalContentAlignment" Value="Stretch" />
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="GridViewItem">
+                        <Grid>
+                            <VisualStateManager.VisualStateGroups>
+                                <VisualStateGroup x:Name="FocusStates">
+                                    <VisualState x:Name="Focused">
+                                        <VisualState.Setters>
+                                            <Setter Target="FocusVisualBorder.Opacity" Value="1" />
+                                            <Setter Target="FocusVisualInnerBorder.Opacity" Value="1" />
+                                        </VisualState.Setters>
+                                    </VisualState>
+                                    <!-- Deliberately empty like the WinUI default item template:
+                                         pointer/touch focus must not draw the focus ring; only the
+                                         keyboard Focused state shows it. -->
+                                    <VisualState x:Name="PointerFocused" />
+                                    <VisualState x:Name="Unfocused">
+                                        <VisualState.Setters>
+                                            <Setter Target="FocusVisualBorder.Opacity" Value="0" />
+                                            <Setter Target="FocusVisualInnerBorder.Opacity" Value="0" />
+                                        </VisualState.Setters>
+                                    </VisualState>
+                                </VisualStateGroup>
+                            </VisualStateManager.VisualStateGroups>
+                            <ContentPresenter
+                                Content="{TemplateBinding Content}"
+                                ContentTemplate="{TemplateBinding ContentTemplate}"
+                                HorizontalAlignment="{TemplateBinding HorizontalContentAlignment}"
+                                VerticalAlignment="{TemplateBinding VerticalContentAlignment}" />
+                            <Border
+                                x:Name="FocusVisualBorder"
+                                BorderBrush="{ThemeResource FocusStrokeColorOuterBrush}"
+                                BorderThickness="2"
+                                CornerRadius="2"
+                                IsHitTestVisible="False"
+                                Opacity="0" />
+                            <Border
+                                x:Name="FocusVisualInnerBorder"
+                                Margin="2"
+                                BorderBrush="{ThemeResource FocusStrokeColorInnerBrush}"
+                                BorderThickness="1"
+                                CornerRadius="1"
+                                IsHitTestVisible="False"
+                                Opacity="0" />
+                        </Grid>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
+        <Style x:Key="SurfaceListViewItemStyle" TargetType="ListViewItem">
+            <Setter Property="Padding" Value="0" />
+            <Setter Property="Margin" Value="0" />
+            <Setter Property="MinHeight" Value="0" />
+            <Setter Property="CanDrag" Value="True" />
+            <Setter Property="UseSystemFocusVisuals" Value="True" />
+            <Setter Property="Background" Value="Transparent" />
+            <Setter Property="BorderBrush" Value="Transparent" />
+            <Setter Property="BorderThickness" Value="0" />
+            <Setter Property="HorizontalContentAlignment" Value="Stretch" />
+            <Setter Property="VerticalContentAlignment" Value="Stretch" />
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="ListViewItem">
+                        <Grid>
+                            <VisualStateManager.VisualStateGroups>
+                                <VisualStateGroup x:Name="FocusStates">
+                                    <VisualState x:Name="Focused">
+                                        <VisualState.Setters>
+                                            <Setter Target="FocusVisualBorder.Opacity" Value="1" />
+                                            <Setter Target="FocusVisualInnerBorder.Opacity" Value="1" />
+                                        </VisualState.Setters>
+                                    </VisualState>
+                                    <!-- Deliberately empty like the WinUI default item template:
+                                         pointer/touch focus must not draw the focus ring; only the
+                                         keyboard Focused state shows it. -->
+                                    <VisualState x:Name="PointerFocused" />
+                                    <VisualState x:Name="Unfocused">
+                                        <VisualState.Setters>
+                                            <Setter Target="FocusVisualBorder.Opacity" Value="0" />
+                                            <Setter Target="FocusVisualInnerBorder.Opacity" Value="0" />
+                                        </VisualState.Setters>
+                                    </VisualState>
+                                </VisualStateGroup>
+                            </VisualStateManager.VisualStateGroups>
+                            <ContentPresenter
+                                Content="{TemplateBinding Content}"
+                                ContentTemplate="{TemplateBinding ContentTemplate}"
+                                HorizontalAlignment="{TemplateBinding HorizontalContentAlignment}"
+                                VerticalAlignment="{TemplateBinding VerticalContentAlignment}" />
+                            <Border
+                                x:Name="FocusVisualBorder"
+                                BorderBrush="{ThemeResource FocusStrokeColorOuterBrush}"
+                                BorderThickness="2"
+                                CornerRadius="2"
+                                IsHitTestVisible="False"
+                                Opacity="0" />
+                            <Border
+                                x:Name="FocusVisualInnerBorder"
+                                Margin="2"
+                                BorderBrush="{ThemeResource FocusStrokeColorInnerBrush}"
+                                BorderThickness="1"
+                                CornerRadius="1"
+                                IsHitTestVisible="False"
+                                Opacity="0" />
+                        </Grid>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
+        <Style
+            x:Key="FileStackActionButtonStyle"
+            TargetType="Button"
+            BasedOn="{StaticResource WidgetItemActionButtonStyle}">
+            <Setter Property="Background" Value="{ThemeResource SubtleFillColorSecondaryBrush}" />
+            <Setter Property="BorderBrush" Value="{ThemeResource CardStrokeColorDefaultBrush}" />
+            <Setter Property="BorderThickness" Value="1" />
+            <Setter Property="CornerRadius" Value="6" />
+        </Style>
+
+        <!-- Explicit virtualizing panels keep the cached stack popup bounded to
+             its viewport instead of allowing a default panel to retain every
+             realized member after source changes. Under Native AOT these
+             template resources cross back into managed code as the base
+             FrameworkTemplate type; the popover code then leaves the control
+             defaults in place (GridView wraps horizontally, ListView stacks
+             vertically) instead of assigning null and falling back to a plain
+             StackPanel. -->
+        <ItemsPanelTemplate x:Key="StackPopoverIconItemsPanelTemplate">
+            <ItemsWrapGrid Orientation="Horizontal" />
+        </ItemsPanelTemplate>
+        <ItemsPanelTemplate x:Key="StackPopoverListItemsPanelTemplate">
+            <ItemsStackPanel Orientation="Vertical" />
+        </ItemsPanelTemplate>
+
+        <DataTemplate x:Key="SurfaceFileIconTemplate">
+            <Grid
+                Tag="ItemSlot"
+                Width="{Binding DataContext.IconTileWidth, ElementName=ItemsGrid}"
+                Height="{Binding DataContext.IconTileHeight, ElementName=ItemsGrid}"
+                Margin="{Binding DataContext.IconTileMargin, ElementName=ItemsGrid}"
+                HorizontalAlignment="Left"
+                VerticalAlignment="Top">
+                <controls:FileItemSurface
+                    Mode="Icon"
+                    LayoutContext="{Binding DataContext, ElementName=ItemsGrid}"
+                    UseStackChildIndent="True"
+                    HorizontalAlignment="Stretch"
+                    VerticalAlignment="Top"
+                    AllowDrop="True"
+                    Loaded="ItemSurface_Loaded"
+                    Unloaded="ItemSurface_Unloaded"
+                    VisualStateChanged="ItemSurface_VisualStateChanged"
+                    DataContextChanged="ItemSurface_DataContextChanged"
+                    DragLeave="ItemSurface_DragLeave"
+                    DragOver="ItemSurface_DragOver"
+                    Drop="ItemSurface_Drop"
+                    PointerPressed="ItemSurface_PointerPressed"
+                    PointerReleased="ItemSurface_PointerGestureEnded"
+                    PointerCaptureLost="ItemSurface_PointerGestureEnded" />
+            </Grid>
+        </DataTemplate>
+
+        <DataTemplate x:Key="SurfaceFileStackIconTemplate">
+            <Border
+                Tag="StackSurface"
+                Width="{Binding TileWidth}"
+                MinHeight="{Binding TileHeight}"
+                Margin="{Binding TileMargin}"
+                Padding="{Binding TilePadding}"
+                CornerRadius="2"
+                AutomationProperties.HelpText="{Binding Summary}"
+                AutomationProperties.ItemStatus="{Binding AutomationState}"
+                AutomationProperties.Name="{Binding Name}"
+                AllowDrop="True"
+                Loaded="StackSurface_Loaded"
+                Unloaded="StackSurface_Unloaded"
+                DragLeave="StackSurface_DragLeave"
+                DragOver="StackSurface_DragOver"
+                Drop="StackSurface_Drop"
+                PointerEntered="StackSurface_PointerEntered"
+                PointerExited="StackSurface_PointerExited"
+                PointerPressed="StackSurface_PointerPressed"
+                PointerReleased="StackSurface_PointerReleased"
+                ToolTipService.ToolTip="{Binding AutomationState}">
+                <StackPanel HorizontalAlignment="Center" Spacing="4">
+                    <Grid
+                        Tag="StackPreviewHost"
+                        Width="{Binding PreviewSize}"
+                        Height="{Binding PreviewSize}">
+                        <Grid Visibility="{Binding CollapsedPreviewVisibility}">
+                            <Border
+                                Tag="StackPopoverFolderBackdrop"
+                                Margin="1"
+                                Background="{ThemeResource SubtleFillColorSecondaryBrush}"
+                                BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}"
+                                BorderThickness="1"
+                                CornerRadius="10"
+                                IsHitTestVisible="False"
+                                Visibility="Collapsed" />
+                            <Grid
+                                Tag="StackPreviewFour"
+                                Width="{Binding PreviewItemSize}"
+                                Height="{Binding PreviewItemSize}"
+                                HorizontalAlignment="Center"
+                                VerticalAlignment="Center"
+                                Opacity="0"
+                                Visibility="{Binding FourthPreviewVisibility}">
+                                <Image Source="{Binding PreviewFour.Icon}" Stretch="Uniform" Visibility="{Binding PreviewFour.IconVisibility}" />
+                                <ContentControl Style="{StaticResource FileIconLoadingPlaceholderStyle}" Width="{Binding PreviewItemSize}" Height="{Binding PreviewItemSize}" Visibility="{Binding PreviewFour.FallbackIconVisibility}" />
+                            </Grid>
+                            <Grid
+                                Tag="StackPreviewThree"
+                                Width="{Binding PreviewItemSize}"
+                                Height="{Binding PreviewItemSize}"
+                                HorizontalAlignment="Center"
+                                VerticalAlignment="Center"
+                                Opacity="0.72"
+                                RenderTransformOrigin="0.5,0.82"
+                                Visibility="{Binding ThirdPreviewVisibility}">
+                                <Grid.RenderTransform>
+                                    <CompositeTransform Rotation="-7" ScaleX="0.70" ScaleY="0.70" TranslateX="-5" TranslateY="3" />
+                                </Grid.RenderTransform>
+                                <Image Source="{Binding PreviewThree.Icon}" Stretch="Uniform" Visibility="{Binding PreviewThree.IconVisibility}" />
+                                <ContentControl Style="{StaticResource FileIconLoadingPlaceholderStyle}" Width="{Binding PreviewItemSize}" Height="{Binding PreviewItemSize}" Visibility="{Binding PreviewThree.FallbackIconVisibility}" />
+                            </Grid>
+                            <Grid
+                                Tag="StackPreviewTwo"
+                                Width="{Binding PreviewItemSize}"
+                                Height="{Binding PreviewItemSize}"
+                                HorizontalAlignment="Center"
+                                VerticalAlignment="Center"
+                                Opacity="0.88"
+                                RenderTransformOrigin="0.5,0.82">
+                                <Grid.RenderTransform>
+                                    <CompositeTransform Rotation="6" ScaleX="0.80" ScaleY="0.80" TranslateX="5" TranslateY="2" />
+                                </Grid.RenderTransform>
+                                <Image Source="{Binding PreviewTwo.Icon}" Stretch="Uniform" Visibility="{Binding PreviewTwo.IconVisibility}" />
+                                <ContentControl Style="{StaticResource FileIconLoadingPlaceholderStyle}" Width="{Binding PreviewItemSize}" Height="{Binding PreviewItemSize}" Visibility="{Binding PreviewTwo.FallbackIconVisibility}" />
+                            </Grid>
+                            <Grid
+                                Tag="StackPreviewOne"
+                                Width="{Binding PreviewItemSize}"
+                                Height="{Binding PreviewItemSize}"
+                                HorizontalAlignment="Center"
+                                VerticalAlignment="Center"
+                                RenderTransformOrigin="0.5,0.82">
+                                <Grid.RenderTransform>
+                                    <CompositeTransform ScaleX="0.90" ScaleY="0.90" TranslateY="-2" />
+                                </Grid.RenderTransform>
+                                <Image Source="{Binding PreviewOne.Icon}" Stretch="Uniform" Visibility="{Binding PreviewOne.IconVisibility}" />
+                                <ContentControl Style="{StaticResource FileIconLoadingPlaceholderStyle}" Width="{Binding PreviewItemSize}" Height="{Binding PreviewItemSize}" Visibility="{Binding PreviewOne.FallbackIconVisibility}" />
+                            </Grid>
+                            <Border
+                                Tag="StackPreviewCountBadge"
+                                MinWidth="16"
+                                Height="16"
+                                Padding="3,0"
+                                Margin="0,0,1,1"
+                                HorizontalAlignment="Right"
+                                VerticalAlignment="Bottom"
+                                Background="{ThemeResource AccentFillColorDefaultBrush}"
+                                CornerRadius="8">
+                                <TextBlock
+                                    helpers:WidgetTextShadow.Cast="True"
+                                    Tag="StackPreviewCountText"
+                                    HorizontalAlignment="Center"
+                                    VerticalAlignment="Center"
+                                    FontSize="9"
+                                    Foreground="{ThemeResource TextOnAccentFillColorPrimaryBrush}"
+                                    Text="{Binding CountText}" />
+                            </Border>
+                        </Grid>
+                        <Button svc:Localized.AutomationNameKey="Widget.Stack.Collapse"
+                            Width="{Binding PreviewItemSize}"
+                            Height="{Binding PreviewItemSize}"
+                            MinWidth="28"
+                            MinHeight="28"
+                            Padding="0"
+                            HorizontalAlignment="Center"
+                            VerticalAlignment="Center"
+                            Click="StackCollapseButton_Click"
+                            IsTabStop="False"
+                            Style="{StaticResource FileStackActionButtonStyle}"
+                            Visibility="{Binding ExpandedAnchorVisibility}">
+                            <FontIcon FontSize="12" Glyph="&#xE70E;" />
+                        </Button>
+                    </Grid>
+                    <TextBlock
+                        helpers:WidgetTextShadow.Cast="True"
+                        MaxWidth="{Binding LabelMaxWidth}"
+                        Margin="2,0"
+                        HorizontalAlignment="Center"
+                        FontSize="{Binding LabelFontSize}"
+                        MaxLines="{Binding DataContext.IconLabelMaxLines, ElementName=ItemsGrid}"
+                        Tag="StackName"
+                        Text="{Binding Name}"
+                        TextAlignment="Center"
+                        TextTrimming="CharacterEllipsis"
+                        TextWrapping="Wrap"
+                        Visibility="{Binding DataContext.IconLabelVisibility, ElementName=ItemsGrid}" />
+                </StackPanel>
+            </Border>
+        </DataTemplate>
+
+        <DataTemplate x:Key="SurfaceFileListTemplate">
+            <controls:FileItemSurface
+                Mode="List"
+                LayoutContext="{Binding DataContext, ElementName=ItemsList}"
+                UseStackChildIndent="True"
+                HorizontalAlignment="Stretch"
+                AllowDrop="True"
+                Loaded="ItemSurface_Loaded"
+                Unloaded="ItemSurface_Unloaded"
+                VisualStateChanged="ItemSurface_VisualStateChanged"
+                DataContextChanged="ItemSurface_DataContextChanged"
+                DragLeave="ItemSurface_DragLeave"
+                DragOver="ItemSurface_DragOver"
+                Drop="ItemSurface_Drop"
+                PointerPressed="ItemSurface_PointerPressed"
+                PointerReleased="ItemSurface_PointerGestureEnded"
+                PointerCaptureLost="ItemSurface_PointerGestureEnded" />
+        </DataTemplate>
+
+        <!-- Created only while a stack popover is open. The member objects and
+             existing item surface are reused, while stack-child indentation is
+             deliberately disabled because the panel already provides context. -->
+        <DataTemplate x:Key="StackPopoverFileIconTemplate">
+            <controls:FileItemSurface
+                Mode="Icon"
+                UseStackChildIndent="False"
+                HorizontalAlignment="Stretch"
+                VerticalAlignment="Top"
+                AllowDrop="True"
+                Loaded="ItemSurface_Loaded"
+                Unloaded="ItemSurface_Unloaded"
+                VisualStateChanged="ItemSurface_VisualStateChanged"
+                DataContextChanged="ItemSurface_DataContextChanged"
+                DragLeave="ItemSurface_DragLeave"
+                DragOver="ItemSurface_DragOver"
+                Drop="ItemSurface_Drop"
+                PointerPressed="ItemSurface_PointerPressed"
+                PointerReleased="ItemSurface_PointerGestureEnded"
+                PointerCaptureLost="ItemSurface_PointerGestureEnded" />
+        </DataTemplate>
+
+        <DataTemplate x:Key="StackPopoverFileListTemplate">
+            <controls:FileItemSurface
+                Mode="List"
+                UseStackChildIndent="False"
+                HorizontalAlignment="Stretch"
+                AllowDrop="True"
+                Loaded="ItemSurface_Loaded"
+                Unloaded="ItemSurface_Unloaded"
+                VisualStateChanged="ItemSurface_VisualStateChanged"
+                DataContextChanged="ItemSurface_DataContextChanged"
+                DragLeave="ItemSurface_DragLeave"
+                DragOver="ItemSurface_DragOver"
+                Drop="ItemSurface_Drop"
+                PointerPressed="ItemSurface_PointerPressed"
+                PointerReleased="ItemSurface_PointerGestureEnded"
+                PointerCaptureLost="ItemSurface_PointerGestureEnded" />
+        </DataTemplate>
+
+        <DataTemplate x:Key="SurfaceFileStackListTemplate">
+            <Border
+                Tag="StackSurface"
+                Margin="{Binding ListMargin}"
+                Padding="{Binding ListPadding}"
+                CornerRadius="2"
+                AutomationProperties.HelpText="{Binding Summary}"
+                AutomationProperties.ItemStatus="{Binding AutomationState}"
+                AutomationProperties.Name="{Binding Name}"
+                AllowDrop="True"
+                Loaded="StackSurface_Loaded"
+                Unloaded="StackSurface_Unloaded"
+                DragLeave="StackSurface_DragLeave"
+                DragOver="StackSurface_DragOver"
+                Drop="StackSurface_Drop"
+                PointerEntered="StackSurface_PointerEntered"
+                PointerExited="StackSurface_PointerExited"
+                PointerPressed="StackSurface_PointerPressed"
+                PointerReleased="StackSurface_PointerReleased"
+                ToolTipService.ToolTip="{Binding AutomationState}">
+                <Grid ColumnSpacing="10">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="Auto" />
+                        <ColumnDefinition Width="*" />
+                        <ColumnDefinition Width="Auto" />
+                    </Grid.ColumnDefinitions>
+                    <Grid
+                        Tag="StackPreviewHost"
+                        Width="{Binding ListIconSize}"
+                        Height="{Binding ListIconSize}">
+                        <Grid Visibility="{Binding CollapsedPreviewVisibility}">
+                            <Border
+                                Tag="StackPopoverFolderBackdrop"
+                                Margin="0.5"
+                                Background="{ThemeResource SubtleFillColorSecondaryBrush}"
+                                BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}"
+                                BorderThickness="1"
+                                CornerRadius="7"
+                                IsHitTestVisible="False"
+                                Visibility="Collapsed" />
+                            <Grid Tag="StackPreviewFour" Opacity="0" Visibility="{Binding FourthPreviewVisibility}">
+                                <Image Source="{Binding PreviewFour.Icon}" Stretch="Uniform" Visibility="{Binding PreviewFour.IconVisibility}" />
+                                <ContentControl Style="{StaticResource FileIconLoadingPlaceholderStyle}" Width="{Binding ListIconSize}" Height="{Binding ListIconSize}" Visibility="{Binding PreviewFour.FallbackIconVisibility}" />
+                            </Grid>
+                            <Grid Tag="StackPreviewThree" Opacity="0.55" Visibility="{Binding ThirdPreviewVisibility}">
+                                <Image Source="{Binding PreviewThree.Icon}" Stretch="Uniform" Visibility="{Binding PreviewThree.IconVisibility}" />
+                                <ContentControl Style="{StaticResource FileIconLoadingPlaceholderStyle}" Width="{Binding ListIconSize}" Height="{Binding ListIconSize}" Visibility="{Binding PreviewThree.FallbackIconVisibility}" />
+                            </Grid>
+                            <Grid Tag="StackPreviewTwo" Margin="4,2,0,0" Opacity="0.76">
+                                <Image Source="{Binding PreviewTwo.Icon}" Stretch="Uniform" Visibility="{Binding PreviewTwo.IconVisibility}" />
+                                <ContentControl Style="{StaticResource FileIconLoadingPlaceholderStyle}" Width="{Binding ListIconSize}" Height="{Binding ListIconSize}" Visibility="{Binding PreviewTwo.FallbackIconVisibility}" />
+                            </Grid>
+                            <Grid Tag="StackPreviewOne" Margin="0,0,4,3">
+                                <Image Source="{Binding PreviewOne.Icon}" Stretch="Uniform" Visibility="{Binding PreviewOne.IconVisibility}" />
+                                <ContentControl Style="{StaticResource FileIconLoadingPlaceholderStyle}" Width="{Binding ListIconSize}" Height="{Binding ListIconSize}" Visibility="{Binding PreviewOne.FallbackIconVisibility}" />
+                            </Grid>
+                            <Border
+                                Tag="StackPreviewCountBadge"
+                                MinWidth="14"
+                                Height="14"
+                                Padding="2,0"
+                                HorizontalAlignment="Right"
+                                VerticalAlignment="Bottom"
+                                Background="{ThemeResource AccentFillColorDefaultBrush}"
+                                CornerRadius="7">
+                                <TextBlock
+                                    helpers:WidgetTextShadow.Cast="True"
+                                    Tag="StackPreviewCountText"
+                                    HorizontalAlignment="Center"
+                                    VerticalAlignment="Center"
+                                    FontSize="8"
+                                    Foreground="{ThemeResource TextOnAccentFillColorPrimaryBrush}"
+                                    Text="{Binding CountText}" />
+                            </Border>
+                        </Grid>
+                        <Button svc:Localized.AutomationNameKey="Widget.Stack.Collapse"
+                            Width="{Binding ListIconSize}"
+                            Height="{Binding ListIconSize}"
+                            Padding="0"
+                            Click="StackCollapseButton_Click"
+                            IsTabStop="False"
+                            Style="{StaticResource FileStackActionButtonStyle}"
+                            Visibility="{Binding ExpandedAnchorVisibility}">
+                            <FontIcon FontSize="11" Glyph="&#xE70E;" />
+                        </Button>
+                    </Grid>
+                    <StackPanel Grid.Column="1" VerticalAlignment="Center" Spacing="1">
+                        <TextBlock helpers:WidgetTextShadow.Cast="True" FontSize="{Binding LabelFontSize}" Tag="StackName" Text="{Binding Name}" TextTrimming="CharacterEllipsis" />
+                        <TextBlock helpers:WidgetTextShadow.Cast="True" FontSize="11" Foreground="{ThemeResource TextFillColorSecondaryBrush}" Text="{Binding Summary}" TextTrimming="CharacterEllipsis" />
+                    </StackPanel>
+                    <Button AutomationProperties.Name="{Binding AutomationState}"
+                        Grid.Column="2"
+                        Width="28"
+                        Height="28"
+                        Click="StackToggleButton_Click"
+                        IsTabStop="False"
+                        Style="{StaticResource FileStackActionButtonStyle}"
+                        ToolTipService.ToolTip="{Binding AutomationState}"
+                        VerticalAlignment="Center">
+                        <FontIcon FontSize="10" Glyph="{Binding ChevronGlyph}" />
+                    </Button>
+                </Grid>
+            </Border>
+        </DataTemplate>
+
+        <controls:WidgetItemTemplateSelector
+            x:Key="SurfaceIconTemplateSelector"
+            ItemTemplate="{StaticResource SurfaceFileIconTemplate}"
+            StackTemplate="{StaticResource SurfaceFileStackIconTemplate}" />
+        <controls:WidgetItemTemplateSelector
+            x:Key="SurfaceListTemplateSelector"
+            ItemTemplate="{StaticResource SurfaceFileListTemplate}"
+            StackTemplate="{StaticResource SurfaceFileStackListTemplate}" />
+    </UserControl.Resources>
+
+    <Grid
+        x:Name="Root"
+        Padding="10,4,8,8"
+        AllowDrop="True"
+        DragEnter="Root_DragEnter"
+        DragOver="Root_DragOver"
+        DragLeave="Root_DragLeave"
+        Drop="Root_Drop"
+        KeyDown="Root_KeyDown"
+        CharacterReceived="Root_CharacterReceived">
+        <VisualStateManager.VisualStateGroups>
+            <VisualStateGroup x:Name="ImportOperationStates">
+                <VisualState x:Name="ImportPreparingState">
+                    <VisualState.Setters>
+                        <Setter Target="ImportStateIcon.Glyph" Value="&#xE896;" />
+                        <Setter Target="ImportCancelButton.IsEnabled" Value="True" />
+                    </VisualState.Setters>
+                </VisualState>
+                <VisualState x:Name="ImportLoadingState">
+                    <VisualState.Setters>
+                        <Setter Target="ImportStateIcon.Glyph" Value="&#xE898;" />
+                        <Setter Target="ImportCancelButton.IsEnabled" Value="True" />
+                    </VisualState.Setters>
+                </VisualState>
+                <VisualState x:Name="ImportCancelingState">
+                    <VisualState.Setters>
+                        <Setter Target="ImportStateIcon.Glyph" Value="&#xE895;" />
+                        <Setter Target="ImportCancelButton.IsEnabled" Value="False" />
+                        <Setter Target="ImportCancelButton.Visibility" Value="Collapsed" />
+                        <Setter Target="ImportCancelProgressRing.IsActive" Value="True" />
+                        <Setter Target="ImportCancelProgressRing.Visibility" Value="Visible" />
+                    </VisualState.Setters>
+                </VisualState>
+                <VisualState x:Name="ImportSuccessState">
+                    <VisualState.Setters>
+                        <Setter Target="ImportStateIcon.Glyph" Value="&#xE73E;" />
+                        <Setter Target="ImportCancelButton.Visibility" Value="Collapsed" />
+                    </VisualState.Setters>
+                </VisualState>
+                <VisualState x:Name="ImportCanceledState">
+                    <VisualState.Setters>
+                        <Setter Target="ImportStateIcon.Glyph" Value="&#xE711;" />
+                        <Setter Target="ImportCancelButton.Visibility" Value="Collapsed" />
+                    </VisualState.Setters>
+                </VisualState>
+                <VisualState x:Name="ImportErrorState">
+                    <VisualState.Setters>
+                        <Setter Target="ImportStateIcon.Glyph" Value="&#xE783;" />
+                        <Setter Target="ImportCancelButton.Visibility" Value="Collapsed" />
+                    </VisualState.Setters>
+                </VisualState>
+            </VisualStateGroup>
+        </VisualStateManager.VisualStateGroups>
+        <Grid.RowDefinitions>
+            <RowDefinition Height="*" />
+            <RowDefinition Height="Auto" />
+        </Grid.RowDefinitions>
+
+        <Grid Grid.Row="0">
+            <Grid.RowDefinitions>
+                <RowDefinition Height="Auto" />
+                <RowDefinition Height="*" />
+            </Grid.RowDefinitions>
+
+            <Border
+                x:Name="FolderNavigationBar"
+                Grid.Row="0"
+                Height="34"
+                Margin="3,0"
+                Background="Transparent"
+                CornerRadius="7"
+                Visibility="{Binding FolderNavigationVisibility}">
+                <Grid>
+                    <Border
+                        Background="{ThemeResource SystemControlAcrylicElementBrush}"
+                        CornerRadius="7"
+                        IsHitTestVisible="False"
+                        Opacity="0.24" />
+                    <Grid
+                        Margin="2,1"
+                        ColumnDefinitions="*,Auto"
+                        ColumnSpacing="5">
+                        <Button
+                            x:Name="FolderNavigationUpButton"
+                            Grid.Column="0"
+                            Width="Auto"
+                            Height="28"
+                            MinWidth="0"
+                            Padding="0"
+                            HorizontalAlignment="Stretch"
+                            HorizontalContentAlignment="Stretch"
+                            Click="FolderNavigationUpButton_Click"
+                            Style="{StaticResource WidgetTitleActionButtonStyle}">
+                            <Grid ColumnDefinitions="28,*" ColumnSpacing="5">
+                                <FontIcon
+                                    Grid.Column="0"
+                                    FontSize="12"
+                                    Glyph="&#xE74A;" />
+                                <TextBlock
+                                    x:Name="FolderNavigationText"
+                                    Grid.Column="1"
+                                    VerticalAlignment="Center"
+                                    FontSize="{Binding ListLabelFontSize}"
+                                    Text="{Binding CurrentFolderDisplayName}"
+                                    TextTrimming="CharacterEllipsis"
+                                    ToolTipService.ToolTip="{Binding CurrentFolderRelativePath}" />
+                            </Grid>
+                        </Button>
+                        <Button
+                            x:Name="FolderNavigationRootButton"
+                            Grid.Column="1"
+                            Width="28"
+                            Height="28"
+                            Margin="0,0,4,0"
+                            Padding="0"
+                            Click="FolderNavigationRootButton_Click"
+                            Style="{StaticResource WidgetTitleActionButtonStyle}">
+                            <PathIcon
+                                Width="16"
+                                Height="16"
+                                Data="M6 15.5c0 .28.22.5.5.5H11c1.64 0 2.9-.62 3.75-1.57A5.2 5.2 0 0 0 16 11c0-1.23-.41-2.48-1.25-3.43A4.9 4.9 0 0 0 11 6H5.7l2.65-2.65a.5.5 0 1 0-.7-.7l-3.5 3.5a.5.5 0 0 0 0 .7l3.5 3.5a.5.5 0 0 0 .7-.7L5.71 7H11c1.36 0 2.35.5 3 1.24.66.74 1 1.74 1 2.76s-.34 2.02-1 2.76A3.9 3.9 0 0 1 11 15H6.5a.5.5 0 0 0-.5.5" />
+                        </Button>
+                    </Grid>
+                </Grid>
+            </Border>
+
+            <Grid x:Name="FileItemsViewport" Grid.Row="1">
+
+            <ProgressRing
+                Width="24"
+                Height="24"
+                HorizontalAlignment="Center"
+                VerticalAlignment="Center"
+                IsActive="{Binding IsLoading}"
+                Visibility="{Binding LoadingVisibility}" />
+
+            <GridView
+                x:Name="ItemsGrid"
+                Background="Transparent"
+                IsItemClickEnabled="True"
+                ItemClick="Items_ItemClick"
+                ContainerContentChanging="ItemsView_ContainerContentChanging"
+                Loaded="ItemsGrid_UniformPanelLoaded"
+                ItemsSource="{Binding RenderedItems}"
+                DoubleTapped="Items_DoubleTapped"
+                KeyDown="Root_KeyDown"
+                PointerPressed="Items_PointerPressed"
+                PointerMoved="Items_PointerMoved"
+                PointerReleased="Items_PointerReleased"
+                PointerCaptureLost="Items_PointerCaptureLost"
+                RightTapped="Items_RightTapped"
+                ScrollViewer.VerticalScrollBarVisibility="Hidden"
+                SelectionChanged="Items_SelectionChanged"
+                IsMultiSelectCheckBoxEnabled="False"
+                ItemContainerStyle="{StaticResource SurfaceGridViewItemStyle}"
+                ItemTemplateSelector="{StaticResource SurfaceIconTemplateSelector}"
+                SelectionMode="Extended"
+                Visibility="{Binding IconViewVisibility}">
+                <GridView.ItemsPanel>
+                    <ItemsPanelTemplate>
+                        <ItemsWrapGrid
+                            Orientation="Horizontal" />
+                    </ItemsPanelTemplate>
+                </GridView.ItemsPanel>
+                <GridView.ItemContainerTransitions>
+                    <TransitionCollection>
+                        <RepositionThemeTransition IsStaggeringEnabled="False" />
+                    </TransitionCollection>
+                </GridView.ItemContainerTransitions>
+            </GridView>
+
+            <ListView
+                x:Name="ItemsList"
+                Background="Transparent"
+                IsItemClickEnabled="True"
+                ItemClick="Items_ItemClick"
+                ContainerContentChanging="ItemsView_ContainerContentChanging"
+                ItemsSource="{Binding RenderedItems}"
+                DoubleTapped="Items_DoubleTapped"
+                KeyDown="Root_KeyDown"
+                PointerPressed="Items_PointerPressed"
+                PointerMoved="Items_PointerMoved"
+                PointerReleased="Items_PointerReleased"
+                PointerCaptureLost="Items_PointerCaptureLost"
+                RightTapped="Items_RightTapped"
+                ScrollViewer.VerticalScrollBarVisibility="Hidden"
+                SelectionChanged="Items_SelectionChanged"
+                IsMultiSelectCheckBoxEnabled="False"
+                ItemContainerStyle="{StaticResource SurfaceListViewItemStyle}"
+                ItemTemplateSelector="{StaticResource SurfaceListTemplateSelector}"
+                SelectionMode="Extended"
+                Visibility="{Binding ListViewVisibility}">
+                <ListView.ItemContainerTransitions>
+                    <TransitionCollection>
+                        <RepositionThemeTransition IsStaggeringEnabled="False" />
+                    </TransitionCollection>
+                </ListView.ItemContainerTransitions>
+            </ListView>
+
+            <Grid
+                x:Name="FolderNavigationLoadingOverlay"
+                Canvas.ZIndex="40"
+                Background="Transparent"
+                Visibility="Collapsed">
+                <Border
+                    Width="44"
+                    Height="44"
+                    HorizontalAlignment="Center"
+                    VerticalAlignment="Center"
+                    Background="{ThemeResource CardBackgroundFillColorDefaultBrush}"
+                    BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}"
+                    BorderThickness="1"
+                    CornerRadius="10">
+                    <ProgressRing
+                        x:Name="FolderNavigationLoadingRing"
+                        Width="22"
+                        Height="22"
+                        HorizontalAlignment="Center"
+                        VerticalAlignment="Center"
+                        IsActive="False" />
+                </Border>
+            </Grid>
+
+            <Canvas
+                x:Name="SelectionOverlay"
+                Canvas.ZIndex="20"
+                Background="Transparent"
+                IsHitTestVisible="False">
+                <Border
+                    x:Name="SelectionRectangle"
+                    Width="0"
+                    Height="0"
+                    BorderThickness="1"
+                    CornerRadius="0"
+                    Visibility="Collapsed" />
+                <Grid
+                    x:Name="ReorderInsertionIndicator"
+                    Canvas.ZIndex="25"
+                    Width="0"
+                    Height="0"
+                    IsHitTestVisible="False"
+                    Opacity="0"
+                    Visibility="Collapsed">
+                    <Border
+                        x:Name="ReorderInsertionGlow"
+                        CornerRadius="5"
+                        Opacity="0.32">
+                        <Border.Background>
+                            <LinearGradientBrush StartPoint="0,0.5" EndPoint="1,0.5">
+                                <GradientStop Offset="0" Color="Transparent" />
+                                <GradientStop Offset="0.28" Color="Transparent" />
+                                <GradientStop x:Name="ReorderInsertionAccentStop" Offset="0.5" />
+                                <GradientStop Offset="0.72" Color="Transparent" />
+                                <GradientStop Offset="1" Color="Transparent" />
+                            </LinearGradientBrush>
+                        </Border.Background>
+                    </Border>
+                    <Border
+                        x:Name="ReorderInsertionLine"
+                        Width="2"
+                        Height="2"
+                        HorizontalAlignment="Center"
+                        VerticalAlignment="Center"
+                        Background="{ThemeResource ControlStrongStrokeColorDefaultBrush}"
+                        CornerRadius="1"
+                        Opacity="0.88" />
+                </Grid>
+            </Canvas>
+
+            <TextBox
+                x:Name="ItemRenameTextBox"
+                Canvas.ZIndex="30"
+                Width="220"
+                MaxWidth="280"
+                HorizontalAlignment="Left"
+                VerticalAlignment="Top"
+                Style="{StaticResource WidgetInlineRenameTextBoxStyle}"
+                Visibility="Collapsed"
+                KeyDown="ItemRenameTextBox_KeyDown"
+                LostFocus="ItemRenameTextBox_LostFocus" />
+
+            <StackPanel
+                Margin="16"
+                HorizontalAlignment="Center"
+                VerticalAlignment="Center"
+                Spacing="8"
+                Visibility="Collapsed"
+                x:Name="EmptyState">
+                <FontIcon
+                    HorizontalAlignment="Center"
+                    FontSize="24"
+                    Foreground="{ThemeResource TextFillColorTertiaryBrush}"
+                    Glyph="{Binding EmptyStateGlyph}" />
+                <TextBlock
+                    HorizontalAlignment="Center"
+                    FontSize="14"
+                    Text="{Binding EmptyStateTitle}" />
+                <TextBlock
+                    MaxWidth="240"
+                    HorizontalAlignment="Center"
+                    FontSize="11.5"
+                    Foreground="{ThemeResource TextFillColorSecondaryBrush}"
+                    TextAlignment="Center"
+                    TextWrapping="Wrap"
+                    svc:Localized.Key="Widget.Empty.ActionsHint" />
+                <Button svc:Localized.AutomationNameKey="Widget.AddFile"
+                    x:Name="EmptyAddButton"
+                    HorizontalAlignment="Center"
+                    Click="AddButton_Click">
+                    <StackPanel Orientation="Horizontal" Spacing="7">
+                        <FontIcon FontSize="12" Glyph="&#xE710;" />
+                        <TextBlock x:Name="EmptyAddButtonText" />
+                    </StackPanel>
+                </Button>
+                <Button
+                    x:Name="EmptyStateHelpButton"
+                    Width="24"
+                    Height="24"
+                    Padding="0"
+                    HorizontalAlignment="Center"
+                    Background="Transparent"
+                    BorderThickness="0"
+                    Click="EmptyStateHelpButton_Click"
+                    CornerRadius="12">
+                    <FlyoutBase.AttachedFlyout>
+                        <Flyout x:Name="EmptyStateHelpFlyout" Placement="Bottom">
+                            <StackPanel Width="232" Spacing="6">
+                                <TextBlock
+                                    FontSize="13"
+                                    Foreground="{ThemeResource TextFillColorPrimaryBrush}"
+                                    TextWrapping="Wrap"
+                                    svc:Localized.Key="Widget.Empty.HelpTipTitle" />
+                                <TextBlock
+                                    FontSize="11.5"
+                                    Foreground="{ThemeResource TextFillColorSecondaryBrush}"
+                                    TextWrapping="Wrap"
+                                    svc:Localized.Key="Widget.Empty.HelpTipCause" />
+                                <TextBlock
+                                    FontSize="11.5"
+                                    Foreground="{ThemeResource TextFillColorSecondaryBrush}"
+                                    TextWrapping="Wrap"
+                                    svc:Localized.Key="Widget.Empty.HelpTipCheck" />
+                                <TextBlock
+                                    FontSize="11.5"
+                                    Foreground="{ThemeResource TextFillColorSecondaryBrush}"
+                                    TextWrapping="Wrap"
+                                    svc:Localized.Key="Widget.Empty.HelpTipSolution" />
+                            </StackPanel>
+                        </Flyout>
+                    </FlyoutBase.AttachedFlyout>
+                    <FontIcon
+                        FontSize="11"
+                        Foreground="{ThemeResource TextFillColorSecondaryBrush}"
+                        Glyph="&#xE897;" />
+                </Button>
+                <InfoBar
+                    x:Name="EmptyStateElevatedBar"
+                    Margin="0,2,0,0"
+                    HorizontalAlignment="Center"
+                    FontSize="12"
+                    IsClosable="True"
+                    IsOpen="False"
+                    Padding="12,4"
+                    Severity="Warning" />
+            </StackPanel>
+
+            <Border
+                x:Name="DropOverlay"
+                Margin="3"
+                Padding="18"
+                Background="{ThemeResource LayerFillColorDefaultBrush}"
+                BorderBrush="{ThemeResource ControlStrongStrokeColorDefaultBrush}"
+                BorderThickness="1"
+                CornerRadius="{StaticResource WidgetCornerRadiusLarge}"
+                IsHitTestVisible="False"
+                Opacity="0"
+                Visibility="Collapsed">
+                <StackPanel
+                    HorizontalAlignment="Center"
+                    VerticalAlignment="Center"
+                    Spacing="8">
+                    <FontIcon
+                        x:Name="DropOverlayIcon"
+                        HorizontalAlignment="Center"
+                        FontSize="24"
+                        Glyph="&#xE898;" />
+                    <TextBlock
+                        x:Name="DropOverlayText"
+                        MaxWidth="260"
+                        FontWeight="SemiBold"
+                        TextAlignment="Center"
+                        TextWrapping="Wrap" />
+                </StackPanel>
+            </Border>
+
+            </Grid>
+        </Grid>
+
+            <!-- Hallmark · component: file import progress card · genre: modern-minimal · theme: DeskBox native -->
+            <!-- Hallmark · pre-emit critique: P5 H5 E5 S5 R5 V4 -->
+            <Border
+                x:Name="ImportProgressCard"
+                Grid.Row="0"
+                Canvas.ZIndex="1000"
+                Margin="0,4,0,0"
+                Padding="12,8"
+                HorizontalAlignment="Stretch"
+                VerticalAlignment="Bottom"
+                AutomationProperties.LiveSetting="Polite"
+                Background="{ThemeResource SystemControlAcrylicElementBrush}"
+                BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}"
+                BorderThickness="1,1,1,0"
+                CornerRadius="8,8,0,0"
+                SizeChanged="ImportProgressCard_SizeChanged"
+                Translation="0,0,64"
+                Visibility="Collapsed">
+                <Grid ColumnSpacing="8" RowSpacing="4">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="Auto" />
+                        <ColumnDefinition Width="*" />
+                        <ColumnDefinition Width="Auto" />
+                        <ColumnDefinition Width="Auto" />
+                    </Grid.ColumnDefinitions>
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto" />
+                        <RowDefinition Height="Auto" />
+                        <RowDefinition Height="Auto" />
+                    </Grid.RowDefinitions>
+
+                    <FontIcon
+                        x:Name="ImportStateIcon"
+                        Grid.Row="0"
+                        Grid.Column="0"
+                        FontSize="15"
+                        Glyph="&#xE896;" />
+                    <TextBlock
+                        x:Name="ImportTitleText"
+                        Grid.Row="0"
+                        Grid.Column="1"
+                        VerticalAlignment="Center"
+                        FontSize="13"
+                        FontWeight="SemiBold"
+                        TextTrimming="CharacterEllipsis"
+                        TextWrapping="NoWrap" />
+                    <TextBlock
+                        x:Name="ImportPercentText"
+                        Grid.Row="0"
+                        Grid.Column="2"
+                        VerticalAlignment="Center"
+                        FontSize="12"
+                        Opacity="0.78" />
+                    <Button
+                        x:Name="ImportCancelButton"
+                        Grid.Row="0"
+                        Grid.RowSpan="3"
+                        Grid.Column="3"
+                        Width="44"
+                        Height="44"
+                        Padding="0"
+                        HorizontalAlignment="Right"
+                        VerticalAlignment="Center"
+                        Click="ImportCancelButton_Click">
+                        <FontIcon FontSize="13" Glyph="&#xE711;" />
+                    </Button>
+                    <ProgressRing
+                        x:Name="ImportCancelProgressRing"
+                        Grid.Row="0"
+                        Grid.RowSpan="3"
+                        Grid.Column="3"
+                        Width="20"
+                        Height="20"
+                        HorizontalAlignment="Center"
+                        VerticalAlignment="Center"
+                        IsActive="False"
+                        IsHitTestVisible="False"
+                        Visibility="Collapsed" />
+
+                    <ProgressBar
+                        x:Name="ImportProgressBar"
+                        Grid.Row="1"
+                        Grid.Column="0"
+                        Grid.ColumnSpan="3"
+                        Height="3"
+                        IsIndeterminate="True"
+                        Maximum="100"
+                        Minimum="0" />
+                    <TextBlock
+                        x:Name="ImportDescriptionText"
+                        Grid.Row="2"
+                        Grid.Column="0"
+                        Grid.ColumnSpan="3"
+                        Foreground="{ThemeResource TextFillColorSecondaryBrush}"
+                        FontSize="11"
+                        TextTrimming="CharacterEllipsis"
+                        TextWrapping="NoWrap" />
+                </Grid>
+            </Border>
+
+        <CommandBar
+            x:Name="SelectionCommandBar"
+            Grid.Row="1"
+            Margin="0,6,0,0"
+            Padding="2,0"
+            Background="{ThemeResource SolidBackgroundFillColorBaseBrush}"
+            BorderBrush="{ThemeResource ControlStrokeColorDefaultBrush}"
+            BorderThickness="1"
+            CornerRadius="8"
+            DefaultLabelPosition="Collapsed"
+            IsDynamicOverflowEnabled="True"
+            Visibility="Collapsed">
+            <AppBarButton x:Name="OpenSelectionButton" Click="OpenSelectionButton_Click">
+                <AppBarButton.Icon><FontIcon Glyph="&#xE8E5;" /></AppBarButton.Icon>
+            </AppBarButton>
+            <AppBarButton x:Name="CopySelectionButton" Click="CopySelectionButton_Click">
+                <AppBarButton.Icon><FontIcon Glyph="&#xE8C8;" /></AppBarButton.Icon>
+            </AppBarButton>
+            <AppBarButton x:Name="CutSelectionButton" Click="CutSelectionButton_Click">
+                <AppBarButton.Icon><FontIcon Glyph="&#xE8C6;" /></AppBarButton.Icon>
+            </AppBarButton>
+            <AppBarButton x:Name="DeleteSelectionButton" Click="DeleteSelectionButton_Click">
+                <AppBarButton.Icon><FontIcon Glyph="&#xE74D;" /></AppBarButton.Icon>
+            </AppBarButton>
+            <CommandBar.SecondaryCommands>
+                <AppBarButton x:Name="RenameSelectionButton" Click="RenameSelectionButton_Click">
+                    <AppBarButton.Icon><FontIcon Glyph="&#xE8AC;" /></AppBarButton.Icon>
+                </AppBarButton>
+            </CommandBar.SecondaryCommands>
+        </CommandBar>
+    </Grid>
+</UserControl>

@@ -1,0 +1,28 @@
+{
+  "name": "annoyed",
+  "emotion": "annoyed",
+  "fps": 12,
+  "frameCount": 1,
+  "loop": true,
+  "priority": 22,
+  "mouthAnchor": {
+    "frame": 0,
+    "x": 180,
+    "y": 108
+  },
+  "transitionIn": "",
+  "transitionOut": "",
+  "canvas": {
+    "width": 420,
+    "height": 560
+  },
+  "groundY": 540,
+  "frames": [
+    {
+      "file": "0000.png",
+      "sha256": "7a635c83678d7a1fc9003b89499ff7ab75570bad112adc22d9be2580cfff191f"
+    }
+  ],
+  "reviewed": true,
+  "sourceSha256": "5222484479d413ad921224802f739562aee25be49b5c4197252bff2e47d8a272"
+}

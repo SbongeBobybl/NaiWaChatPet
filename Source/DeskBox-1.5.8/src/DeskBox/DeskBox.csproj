@@ -1,0 +1,474 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <OutputType>WinExe</OutputType>
+    <TargetFramework>net10.0-windows10.0.22621.0</TargetFramework>
+    <!-- Keep the compile-time SDK modern while declaring the supported Win10 floor explicitly. -->
+    <SupportedOSPlatformVersion>10.0.19041.0</SupportedOSPlatformVersion>
+    <RootNamespace>DeskBox</RootNamespace>
+    <Version>1.5.8</Version>
+    <AssemblyVersion>1.5.8.0</AssemblyVersion>
+    <FileVersion>1.5.8.0</FileVersion>
+    <InformationalVersion>1.5.8</InformationalVersion>
+    <IncludeSourceRevisionInInformationalVersion>false</IncludeSourceRevisionInInformationalVersion>
+    <Platforms>x64;ARM64</Platforms>
+    <RuntimeIdentifiers>win-x64;win-arm64</RuntimeIdentifiers>
+    <UseWinUI>true</UseWinUI>
+    <WindowsPackageType>None</WindowsPackageType>
+    <PublishSingleFile>false</PublishSingleFile>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <ApplicationManifest>app.manifest</ApplicationManifest>
+    <EnableMsixTooling>true</EnableMsixTooling>
+    <AppxPackage>false</AppxPackage>
+    <DeskBoxDistribution Condition="'$(DeskBoxDistribution)' == ''">Direct</DeskBoxDistribution>
+    <DeskBoxAotAudit Condition="'$(DeskBoxAotAudit)' == ''">false</DeskBoxAotAudit>
+    <!-- Native AOT smoke scenarios are a test harness, never a retail default. -->
+    <DeskBoxAotSmokeHarness Condition="'$(DeskBoxAotSmokeHarness)' == ''">false</DeskBoxAotSmokeHarness>
+    <!-- Build/package the selected native module for explicit JIT/AOT use;
+         ordinary JIT feature backends still default to C#. -->
+    <DeskBoxRustNative Condition="'$(DeskBoxRustNative)' == ''">false</DeskBoxRustNative>
+    <!-- Stage 7C0 keeps CRT linkage explicit so A/B outputs cannot be reused
+         across incompatible native dependency policies. -->
+    <DeskBoxRustCrtLinkage Condition="'$(DeskBoxRustCrtLinkage)' == ''">Static</DeskBoxRustCrtLinkage>
+    <DeskBoxShellThumbnailProxy Condition="'$(DeskBoxShellThumbnailProxy)' == ''">true</DeskBoxShellThumbnailProxy>
+    <EverythingSdkArchitecture Condition="'$(RuntimeIdentifier)' == 'win-arm64' or '$(Platform)' == 'ARM64'">ARM64</EverythingSdkArchitecture>
+    <EverythingSdkArchitecture Condition="'$(EverythingSdkArchitecture)' == ''">x64</EverythingSdkArchitecture>
+    <DefineConstants Condition="'$(DeskBoxDistribution)' == 'Store'">$(DefineConstants);DESKBOX_STORE</DefineConstants>
+    <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
+    <ApplicationIcon>Assets\NaiWa\NaiWaChatPet.ico</ApplicationIcon>
+  </PropertyGroup>
+
+  <!--
+    Opt-in Native AOT audit profile. Keep ordinary Debug/Release behavior
+    unchanged until the application-level AOT compatibility work is complete.
+  -->
+  <PropertyGroup Condition="'$(DeskBoxAotAudit)' == 'true'">
+    <PublishAot>true</PublishAot>
+    <SelfContained>true</SelfContained>
+    <WindowsAppSDKSelfContained>false</WindowsAppSDKSelfContained>
+    <PublishSingleFile>false</PublishSingleFile>
+    <PublishTrimmed>true</PublishTrimmed>
+    <SuppressTrimAnalysisWarnings>false</SuppressTrimAnalysisWarnings>
+    <TrimmerSingleWarn>false</TrimmerSingleWarn>
+    <JsonSerializerIsReflectionEnabledByDefault>false</JsonSerializerIsReflectionEnabledByDefault>
+  </PropertyGroup>
+
+  <!--
+    Native AOT must not compile the legacy shortcut, music-volume, dynamic
+    Explorer-shell, or Quick Access oracles. Keep this driven by PublishAot so direct AOT
+    publishes and the audit profile agree.
+  -->
+  <PropertyGroup Condition="'$(PublishAot)' == 'true'">
+    <DefineConstants>$(DefineConstants);DESKBOX_NATIVE_AOT</DefineConstants>
+  </PropertyGroup>
+
+  <PropertyGroup Condition="'$(PublishAot)' == 'true' and '$(DeskBoxAotSmokeHarness)' == 'true'">
+    <DefineConstants>$(DefineConstants);DESKBOX_AOT_SMOKE_HARNESS</DefineConstants>
+  </PropertyGroup>
+
+  <!--
+    Keep the retained Native AOT smoke matrix available to explicit audit
+    builds, but remove its source files from every ordinary and retail compile.
+    The AOT bindable-property bridges are production code and intentionally do
+    not match these patterns.
+  -->
+  <ItemGroup Condition="'$(DeskBoxAotSmokeHarness)' != 'true'">
+    <Compile Remove="**\*.Aot*Smoke.cs" />
+    <Compile Remove="Services\Aot*Fixture.cs" />
+  </ItemGroup>
+
+  <!--
+    Native AOT compiles out the legacy shortcut, music-volume, Explorer-shell,
+    and Quick Access COM oracles and uses Rust for exact Recycle Bin recovery, so every supported AOT build must package a matching Rust backend.
+    Reject incomplete and not-yet-supported architecture combinations before compilation.
+  -->
+  <Target
+    Name="ValidateDeskBoxNativeAotConfiguration"
+    BeforeTargets="PrepareForBuild;Publish"
+    Condition="'$(DesignTimeBuild)' != 'true' and '$(PublishAot)' == 'true'">
+    <Error
+      Condition="('$(Platform)' != 'x64' or '$(RuntimeIdentifier)' != 'win-x64') and ('$(Platform)' != 'ARM64' or '$(RuntimeIdentifier)' != 'win-arm64')"
+      Text="DeskBox Native AOT stage 7A requires a matching Platform/RuntimeIdentifier pair: x64/win-x64 or ARM64/win-arm64." />
+    <Error
+      Condition="'$(DeskBoxRustNative)' != 'true'"
+      Text="DeskBox Native AOT stage 5B-4C3B2B2B requires DeskBoxRustNative=true so the Rust-only shortcut, music-volume, Explorer-shell, Quick Access, and exact Recycle Bin recovery paths cannot be published without deskbox_native.dll; completed gates retained by this profile include the shortcut AOT-to-Rust smoke, Explorer and Quick Access read-only, Quick Access pin/unpin, music-volume read-only smoke, system master-volume setter, session-volume recovery, the 5B-4A basic managed UI matrix, the 5B-4B1 deep settings matrix, the 5B-4B2A settings/widget persistence restart matrix, the 5B-4B2B1 Quick Capture content-store persistence restart/delete matrix, the 5B-4B2B2A Todo core task/title/notes/completion/delete persistence restart matrix, the 5B-4B2B2B1 Todo steps create/edit/complete/reload/delete persistence restart matrix, the 5B-4B2B2B2 Todo managed attachments import/project/reload/delete persistence restart matrix, the 5B-4B2C1 Glance owned-local-image/preferences/reload/restore/postflight matrix, the 5B-4B2C2A Weather local settings/view-mode/reload/restore/postflight matrix, the 5B-4B2C2B deterministic non-empty WeatherData/current/hourly/week/skin/unit/view-mode/reload/restore/postflight real-surface matrix, the 5B-4C1A owned local-file surface/navigation/watcher/copy/move/rename/conflict/reload/restore/postflight matrix, the 5B-4C1B1 real single/multi File Widget menu deletion, watcher/UI removal, cross-process exact Recycle Bin query, Rust recovery, content-hash, compensation and postflight matrix, the 5B-4C1B2A real Move Back to Desktop menu, propagated owner HWND, actual SHFileOperationW, deterministic partial/cancel/late-return, persisted history, content-hash, compensation and postflight matrix, the 5B-4C1B2B real File Properties menu, exact owned target, propagated host HWND, actual SHObjectProperties dialog, owner-chain observation, controlled WM_CLOSE, content-hash, natural-exit and isolation matrix, the 5B-4C1C1 modern FileOpenPicker owner, real cancel/select dialog, isolated file import, file/folder StorageItems DataPackage parsing, restart, hash, postflight, natural-exit and no-global-clipboard-mutation matrix, the 5B-4C1C2A registered generated IDropTarget CCW, HDROP callback, native pointer/leave cleanup, copy/move, large-file progress-card layering/acrylic, restart and postflight matrix, the 5B-4C2A standard global/search RegisterHotKey dispatch, conflict rollback, disable/re-enable, reserved-hook lifecycle and cross-process release matrix, the 5B-4C3A deterministic Todo due-candidate, reminder-control, snooze, recurrence generation, completion, cross-process dismissal, restore and postflight matrix, the 5B-4C3B1 three-process Todo native-notification registration, single/aggregate payload, real display, cross-process history, exact tag/group cleanup, unregister and postflight matrix, the 5B-4C3B2A deterministic semicolon/ampersand activation grammar, body/open, complete, four snooze choices, legacy snooze10, invalid-input no-mutation, cross-process persistence/clear and postflight matrix, the 5B-4C3B2B1 source-generated typed activation envelope, atomic multi-entry spool, duplicate/corrupt/legacy handling, startup-ready drain, full UserInput preservation, cold-start recovery, real second-process single-instance forwarding, natural-exit and isolation matrix, the 5B-4C3B2B2A content-ready Todo body target plus Complete/Snooze visible-refresh real-surface matrix, and the 5B-4C3B2B2B genuine Notification Center body/Complete/Snooze running-process and cold-start click provenance matrix; physical Explorer mouse drag/drop, global clipboard session mutation, physical standard/Win+Space keyboard input and Settings/Onboarding recorder validation, real Windows notification click provenance is now covered for running and cold-start paths, while remaining target-device notification delivery variations, real Weather network/location, and online Glance images remain deferred; tray reflection, search-history XAML WMC1506, twenty-two prior leaf compiled bindings, fourteen typed DataTemplate bindings, the file-widget overview's three typed section-editor bridges, eight compiled search-result row bindings, and subsequent narrow generated ViewModel bridges are resolved in managed code, while AOT preview data-root isolation, normal application shutdown, owned-root cleanup, deterministic fixture-only Weather service injection, real Weather and File Widget HWND/XamlRoot and DataTemplate projection, independent owned-file hashing, exact recovery identity, system-dialog ownership and close gates, deferred-path log exclusion, and production-data fingerprint gates are enforced by the preview tooling." />
+    <Error
+      Condition="'$(DeskBoxAotSmokeHarness)' == 'true' and '$(DeskBoxAotAudit)' != 'true'"
+      Text="DeskBoxAotSmokeHarness=true is reserved for explicit DeskBoxAotAudit builds and must not be enabled for retail publishing." />
+    <!-- Native AOT stage 5B-4C3B2B1 and Native AOT stage 5B-4C3B2B2A remain retained by the current profile. -->
+  </Target>
+
+  <!--
+    .NET's COM-wrapper debugger table is intentionally append-only. WinUI apps
+    can otherwise retain every managed wrapper for the lifetime of the process,
+    so production builds disable that debugger-only tracking surface.
+  -->
+  <PropertyGroup Condition="'$(Configuration)' == 'Release'">
+    <DebuggerSupport>false</DebuggerSupport>
+  </PropertyGroup>
+
+  <PropertyGroup Condition="'$(DeskBoxRustNative)' == 'true'">
+    <DeskBoxRustNativePlatform Condition="'$(RuntimeIdentifier)' == 'win-x64'">x64</DeskBoxRustNativePlatform>
+    <DeskBoxRustNativePlatform Condition="'$(RuntimeIdentifier)' == 'win-arm64'">ARM64</DeskBoxRustNativePlatform>
+    <DeskBoxRustNativePlatform Condition="'$(RuntimeIdentifier)' == '' and '$(Platform)' == 'ARM64'">ARM64</DeskBoxRustNativePlatform>
+    <DeskBoxRustNativePlatform Condition="'$(RuntimeIdentifier)' == '' and ('$(Platform)' == 'x64' or '$(Platform)' == 'AnyCPU' or '$(Platform)' == '')">x64</DeskBoxRustNativePlatform>
+    <DeskBoxRustNativeBuildPlatform Condition="'$(Platform)' != ''">$(Platform)</DeskBoxRustNativeBuildPlatform>
+    <DeskBoxRustNativeBuildPlatform Condition="'$(Platform)' == ''">AnyCPU</DeskBoxRustNativeBuildPlatform>
+    <DeskBoxRustNativeRuntimeSegment Condition="'$(RuntimeIdentifier)' != ''">$(RuntimeIdentifier)</DeskBoxRustNativeRuntimeSegment>
+    <DeskBoxRustNativeRuntimeSegment Condition="'$(RuntimeIdentifier)' == ''">no-rid</DeskBoxRustNativeRuntimeSegment>
+    <DeskBoxRustNativeIntermediateDir Condition="'$(DeskBoxRustNativeIntermediateDir)' == ''">$(MSBuildProjectDirectory)\obj\rust-native\$(Configuration)\$(DeskBoxRustNativeBuildPlatform)\$(DeskBoxRustNativeRuntimeSegment)\$(DeskBoxRustCrtLinkage)</DeskBoxRustNativeIntermediateDir>
+    <DeskBoxRustNativeCargoTargetDir Condition="'$(DeskBoxRustNativeCargoTargetDir)' == ''">$(DeskBoxRustNativeIntermediateDir)\cargo-target</DeskBoxRustNativeCargoTargetDir>
+    <DeskBoxRustNativeDll>$(DeskBoxRustNativeIntermediateDir)\deskbox_native.dll</DeskBoxRustNativeDll>
+    <DeskBoxRustNativePdb>$(DeskBoxRustNativeIntermediateDir)\deskbox_native.pdb</DeskBoxRustNativePdb>
+  </PropertyGroup>
+
+  <ItemGroup Condition="'$(DeskBoxRustNative)' == 'true'">
+    <DeskBoxRustNativeInput Include="$(MSBuildProjectDirectory)\..\..\rust-toolchain.toml" />
+    <DeskBoxRustNativeInput Include="$(MSBuildProjectDirectory)\..\..\native\Cargo.toml" />
+    <DeskBoxRustNativeInput Include="$(MSBuildProjectDirectory)\..\..\native\Cargo.lock" />
+    <DeskBoxRustNativeInput Include="$(MSBuildProjectDirectory)\..\..\native\README.md" />
+    <DeskBoxRustNativeInput Include="$(MSBuildProjectDirectory)\..\..\native\deskbox-native\Cargo.toml" />
+    <DeskBoxRustNativeInput Include="$(MSBuildProjectDirectory)\..\..\native\deskbox-native\src\**\*" />
+    <DeskBoxRustNativeInput Include="$(MSBuildProjectDirectory)\..\..\native\include\deskbox_native.h" />
+    <DeskBoxRustNativeInput Include="$(MSBuildProjectDirectory)\..\..\scripts\build-rust-native.ps1" />
+    <DeskBoxRustNativeInput Include="$(MSBuildProjectDirectory)\..\..\scripts\native-pe-contract.ps1" />
+    <DeskBoxRustNativeInput Include="$(MSBuildProjectDirectory)\..\..\scripts\rust-arm64-msvc-environment.ps1" />
+  </ItemGroup>
+
+  <PropertyGroup Condition="'$(DeskBoxShellThumbnailProxy)' == 'true'">
+    <DeskBoxThumbnailProxyPlatform Condition="'$(RuntimeIdentifier)' == 'win-x64'">x64</DeskBoxThumbnailProxyPlatform>
+    <DeskBoxThumbnailProxyPlatform Condition="'$(RuntimeIdentifier)' == 'win-arm64'">ARM64</DeskBoxThumbnailProxyPlatform>
+    <DeskBoxThumbnailProxyPlatform Condition="'$(RuntimeIdentifier)' == '' and '$(Platform)' == 'ARM64'">ARM64</DeskBoxThumbnailProxyPlatform>
+    <DeskBoxThumbnailProxyPlatform Condition="'$(RuntimeIdentifier)' == '' and ('$(Platform)' == 'x64' or '$(Platform)' == 'AnyCPU' or '$(Platform)' == '')">x64</DeskBoxThumbnailProxyPlatform>
+    <DeskBoxThumbnailProxyBuildPlatform Condition="'$(Platform)' != ''">$(Platform)</DeskBoxThumbnailProxyBuildPlatform>
+    <DeskBoxThumbnailProxyBuildPlatform Condition="'$(Platform)' == ''">AnyCPU</DeskBoxThumbnailProxyBuildPlatform>
+    <DeskBoxThumbnailProxyRuntimeSegment Condition="'$(RuntimeIdentifier)' != ''">$(RuntimeIdentifier)</DeskBoxThumbnailProxyRuntimeSegment>
+    <DeskBoxThumbnailProxyRuntimeSegment Condition="'$(RuntimeIdentifier)' == ''">no-rid</DeskBoxThumbnailProxyRuntimeSegment>
+    <DeskBoxThumbnailProxyIntermediateDir Condition="'$(DeskBoxThumbnailProxyIntermediateDir)' == ''">$(MSBuildProjectDirectory)\obj\rust-thumbnail-proxy\$(Configuration)\$(DeskBoxThumbnailProxyBuildPlatform)\$(DeskBoxThumbnailProxyRuntimeSegment)\$(DeskBoxRustCrtLinkage)</DeskBoxThumbnailProxyIntermediateDir>
+    <DeskBoxThumbnailProxyCargoTargetDir Condition="'$(DeskBoxThumbnailProxyCargoTargetDir)' == ''">$(DeskBoxThumbnailProxyIntermediateDir)\cargo-target</DeskBoxThumbnailProxyCargoTargetDir>
+    <DeskBoxThumbnailProxyExe>$(DeskBoxThumbnailProxyIntermediateDir)\DeskBox.ThumbnailProxy.exe</DeskBoxThumbnailProxyExe>
+    <DeskBoxThumbnailProxyPdb>$(DeskBoxThumbnailProxyIntermediateDir)\DeskBox.ThumbnailProxy.pdb</DeskBoxThumbnailProxyPdb>
+  </PropertyGroup>
+
+  <ItemGroup Condition="'$(DeskBoxShellThumbnailProxy)' == 'true'">
+    <DeskBoxThumbnailProxyInput Include="$(MSBuildProjectDirectory)\..\..\rust-toolchain.toml" />
+    <DeskBoxThumbnailProxyInput Include="$(MSBuildProjectDirectory)\..\..\native\Cargo.toml" />
+    <DeskBoxThumbnailProxyInput Include="$(MSBuildProjectDirectory)\..\..\native\Cargo.lock" />
+    <DeskBoxThumbnailProxyInput Include="$(MSBuildProjectDirectory)\..\..\native\deskbox-thumbnail-proxy\Cargo.toml" />
+    <DeskBoxThumbnailProxyInput Include="$(MSBuildProjectDirectory)\..\..\native\deskbox-thumbnail-proxy\src\**\*" />
+    <DeskBoxThumbnailProxyInput Include="$(MSBuildProjectDirectory)\..\..\scripts\build-rust-thumbnail-proxy.ps1" />
+    <DeskBoxThumbnailProxyInput Include="$(MSBuildProjectDirectory)\..\..\scripts\rust-arm64-msvc-environment.ps1" />
+  </ItemGroup>
+
+  <PropertyGroup Condition="'$(DeskBoxDistribution)' == 'Store'">
+    <WindowsPackageType>MSIX</WindowsPackageType>
+    <TargetPlatformMinVersion>10.0.19041.0</TargetPlatformMinVersion>
+    <DefaultLanguage>zh-CN</DefaultLanguage>
+    <AppxPackageSigningEnabled Condition="'$(AppxPackageSigningEnabled)' == ''">false</AppxPackageSigningEnabled>
+    <UapAppxPackageBuildMode Condition="'$(UapAppxPackageBuildMode)' == ''">SideloadOnly</UapAppxPackageBuildMode>
+    <AppxPackage Condition="'$(DeskBoxCreateMsixPackage)' == 'true'">true</AppxPackage>
+    <GenerateAppxPackageOnBuild Condition="'$(DeskBoxCreateMsixPackage)' == 'true'">true</GenerateAppxPackageOnBuild>
+    <AppxBundle Condition="'$(DeskBoxCreateMsixPackage)' == 'true' and '$(AppxBundle)' == ''">Never</AppxBundle>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="CommunityToolkit.WinUI.Animations" Version="8.2.251219" />
+    <PackageReference Include="CommunityToolkit.WinUI.Controls.ColorPicker" Version="8.2.251219" />
+    <PackageReference Include="CommunityToolkit.WinUI.Controls.Segmented" Version="8.2.251219" />
+    <PackageReference Include="CommunityToolkit.WinUI.Controls.SettingsControls" Version="8.2.251219" />
+    <PackageReference Include="CommunityToolkit.WinUI.Controls.Sizers" Version="8.2.251219" />
+    <PackageReference Include="Microsoft.WindowsAppSDK" Version="2.5.1" />
+    <!-- WinAppSDK 2.5 transitively ships an AI/ML inference stack
+         (WindowsAppSDK.ML -> Microsoft.Windows.AI.MachineLearning:
+         onnxruntime + DirectML, ~39 MB of native DLLs per architecture)
+         that DeskBox never references; exclude it from every package.
+         Drop this override if Windows AI features are ever adopted. -->
+    <PackageReference Include="Microsoft.Windows.AI.MachineLearning" Version="2.1.74" ExcludeAssets="all" />
+    <PackageReference Include="Microsoft.Windows.SDK.BuildTools" Version="10.0.28000.2270" />
+    <PackageReference Include="WinUIEx" Version="2.9.3" />
+    <PackageReference Include="H.NotifyIcon.WinUI" Version="2.5.0-beta.1" />
+    <PackageReference Include="CommunityToolkit.Mvvm" Version="8.4.2" />
+    <PackageReference Include="Microsoft.Extensions.DependencyInjection" Version="8.0.1" />
+    <PackageReference Include="Markdig" Version="1.3.2" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <None Remove="ThirdParty\Everything\Everything64.dll" />
+    <None Remove="ThirdParty\Everything\EverythingARM64.dll" />
+    <Content Include="ThirdParty\Everything\Everything64.dll" Condition="'$(EverythingSdkArchitecture)' == 'x64'">
+      <Link>EverythingSdk.dll</Link>
+      <TargetPath>EverythingSdk.dll</TargetPath>
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+      <CopyToPublishDirectory>PreserveNewest</CopyToPublishDirectory>
+    </Content>
+    <Content Include="ThirdParty\Everything\EverythingARM64.dll" Condition="'$(EverythingSdkArchitecture)' == 'ARM64'">
+      <Link>EverythingSdk.dll</Link>
+      <TargetPath>EverythingSdk.dll</TargetPath>
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+      <CopyToPublishDirectory>PreserveNewest</CopyToPublishDirectory>
+    </Content>
+    <None Update="ThirdParty\Everything\LICENSE.txt">
+      <TargetPath>ThirdParty\Everything\LICENSE.txt</TargetPath>
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+      <CopyToPublishDirectory>PreserveNewest</CopyToPublishDirectory>
+    </None>
+  </ItemGroup>
+
+  <Target Name="ValidateEverythingSdkArchitecture" BeforeTargets="PrepareForBuild;Publish" Condition="'$(DesignTimeBuild)' != 'true'">
+    <Error
+      Condition="('$(Platform)' == 'x64' and '$(RuntimeIdentifier)' == 'win-arm64') or ('$(Platform)' == 'ARM64' and '$(RuntimeIdentifier)' == 'win-x64')"
+      Text="Everything SDK requires matching Platform and RuntimeIdentifier architectures." />
+    <Error
+      Condition="'$(EverythingSdkArchitecture)' != 'x64' and '$(EverythingSdkArchitecture)' != 'ARM64'"
+      Text="Everything SDK supports only x64 and ARM64 DeskBox builds." />
+  </Target>
+
+  <ItemGroup>
+    <!--
+      Microsoft.WinUI.props adds every file below Assets as Content before this
+      project is evaluated. Remove the Direct-only support images first, then
+      opt them back in only for Direct builds so Store packaging cannot inherit
+      them through the SDK wildcard.
+    -->
+    <Content Remove="Assets\wechat-qrcode.jpg" />
+    <Content Remove="Assets\Support\*.png" />
+    <!-- city data is consumed exclusively through the embedded resource in
+         CitySearchService; the SDK wildcard Content copy is dead weight in
+         every package -->
+    <Content Remove="Assets\Cities\cities.json" />
+    <Content Update="Assets\NaiWa\*">
+      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+      <CopyToPublishDirectory>Always</CopyToPublishDirectory>
+    </Content>
+    <Content Include="Assets\deskbox.ico">
+      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+    </Content>
+    <Content Include="Assets\deskbox.svg">
+      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+    </Content>
+    <Content Include="Assets\deskbox-tray-light.ico">
+      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+    </Content>
+    <Content Include="Assets\deskbox-tray-dark.ico">
+      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+    </Content>
+    <Content Include="Assets\deskbox-tray-light.svg">
+      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+    </Content>
+    <Content Include="Assets\deskbox-tray-dark.svg">
+      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+    </Content>
+    <Content Include="Assets\wechat-qrcode.jpg" Condition="'$(DeskBoxDistribution)' != 'Store'">
+      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+    </Content>
+    <Content Include="Assets\SettingsNavIcons\*.svg">
+      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+    </Content>
+    <Content Include="Assets\WeatherIcons\**\*.svg">
+      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+    </Content>
+    <Content Include="Assets\WeatherIcons\LICENSE-meteocons.txt">
+      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+    </Content>
+    <Content Include="Assets\WeatherIcons\LICENSE-fluent-emoji.txt">
+      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+    </Content>
+    <Content Include="Assets\WidgetTitleIcons\*.svg">
+      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+    </Content>
+    <Content Include="Assets\Store\*.png" />
+    <Content Include="Assets\Support\*.png" Condition="'$(DeskBoxDistribution)' != 'Store'">
+      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+      <CopyToPublishDirectory>Always</CopyToPublishDirectory>
+    </Content>
+    <EmbeddedResource Include="Assets\Cities\cities.json" />
+    <EmbeddedResource Include="Strings\zh-CN.json" />
+    <EmbeddedResource Include="Strings\zh-TW.json" />
+    <EmbeddedResource Include="Strings\en-US.json" />
+    <EmbeddedResource Include="Strings\ja-JP.json" />
+    <EmbeddedResource Include="Strings\de-DE.json" />
+    <EmbeddedResource Include="Strings\pt-BR.json" />
+    <EmbeddedResource Include="Strings\hi-IN.json" />
+    <EmbeddedResource Include="Strings\es-ES.json" />
+    <EmbeddedResource Include="Strings\fr-FR.json" />
+    <EmbeddedResource Include="Strings\ar-SA.json" />
+    <EmbeddedResource Include="Strings\bn-BD.json" />
+    <EmbeddedResource Include="Strings\ru-RU.json" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Manifest Include="$(ApplicationManifest)" />
+  </ItemGroup>
+
+  <!-- PRI resources (.resw) in Resources/ subdirectories are auto-included by the .NET SDK -->
+  <!-- They provide AppDisplayName and AppDescription for the MSIX manifest's ms-resource: references -->
+
+  <ItemGroup Condition="'$(DisableMsixProjectCapabilityAddedByProject)' != 'true' and '$(EnableMsixTooling)' == 'true'">
+    <ProjectCapability Include="Msix" />
+  </ItemGroup>
+
+  <PropertyGroup Condition="'$(DisableHasPackageAndPublishMenuAddedByProject)' != 'true' and '$(EnableMsixTooling)' == 'true'">
+    <HasPackageAndPublishMenu>true</HasPackageAndPublishMenu>
+  </PropertyGroup>
+
+  <Target Name="BuildDeskBoxUpdater" BeforeTargets="Build" Condition="'$(DesignTimeBuild)' != 'true' and '$(DeskBoxDistribution)' != 'Store' and '$(PublishAot)' != 'true'">
+    <MSBuild
+      Projects="..\DeskBox.Updater\DeskBox.Updater.csproj"
+      Targets="Build"
+      Properties="Configuration=$(Configuration);Platform=$(Platform);RuntimeIdentifier=$(RuntimeIdentifier)" />
+  </Target>
+
+  <Target Name="CopyDeskBoxUpdater" AfterTargets="Build" Condition="'$(DesignTimeBuild)' != 'true' and '$(DeskBoxDistribution)' != 'Store' and '$(PublishAot)' != 'true'">
+    <ItemGroup>
+      <DeskBoxUpdaterOutput Include="..\DeskBox.Updater\bin\$(Platform)\$(Configuration)\$(TargetFramework)\$(RuntimeIdentifier)\DeskBox.Updater.*" Condition="'$(RuntimeIdentifier)' != ''" />
+      <DeskBoxUpdaterOutput Include="..\DeskBox.Updater\bin\$(Platform)\$(Configuration)\$(TargetFramework)\DeskBox.Updater.*" Condition="'$(RuntimeIdentifier)' == '' and '$(Platform)' != 'AnyCPU' and '$(Platform)' != ''" />
+      <DeskBoxUpdaterOutput Include="..\DeskBox.Updater\bin\$(Configuration)\$(TargetFramework)\DeskBox.Updater.*" Condition="'$(RuntimeIdentifier)' == '' and ('$(Platform)' == 'AnyCPU' or '$(Platform)' == '')" />
+    </ItemGroup>
+    <Copy SourceFiles="@(DeskBoxUpdaterOutput)" DestinationFolder="$(OutDir)" SkipUnchangedFiles="true" />
+  </Target>
+
+  <Target Name="PublishDeskBoxUpdater" AfterTargets="Publish" Condition="'$(DesignTimeBuild)' != 'true' and '$(DeskBoxDistribution)' != 'Store'">
+    <MSBuild
+      Projects="..\DeskBox.Updater\DeskBox.Updater.csproj"
+      Targets="Publish"
+      Properties="Configuration=$(Configuration);Platform=$(Platform);RuntimeIdentifier=$(RuntimeIdentifier);DeskBoxAotAudit=$(DeskBoxAotAudit);DeskBoxAotSmokeHarness=$(DeskBoxAotSmokeHarness);PublishAot=$(PublishAot);IlcUseEnvironmentalTools=$(IlcUseEnvironmentalTools);SelfContained=$(SelfContained);PublishSingleFile=false;PublishDir=$(PublishDir)" />
+  </Target>
+
+  <Target
+    Name="BuildDeskBoxRustNative"
+    BeforeTargets="CoreCompile"
+    Condition="'$(DesignTimeBuild)' != 'true' and '$(DeskBoxRustNative)' == 'true'"
+    Inputs="@(DeskBoxRustNativeInput)"
+    Outputs="$(DeskBoxRustNativeDll);$(DeskBoxRustNativePdb)">
+    <Error
+      Condition="'$(DeskBoxRustCrtLinkage)' != 'Dynamic' and '$(DeskBoxRustCrtLinkage)' != 'Static'"
+      Text="DeskBox Rust CRT linkage must be Dynamic or Static." />
+    <Error
+      Condition="'$(RuntimeIdentifier)' != '' and '$(RuntimeIdentifier)' != 'win-x64' and '$(RuntimeIdentifier)' != 'win-arm64'"
+      Text="DeskBox Rust native stage 7A supports RuntimeIdentifier=win-x64 or win-arm64." />
+    <Error
+      Condition="'$(Platform)' != '' and '$(Platform)' != 'AnyCPU' and '$(Platform)' != 'x64' and '$(Platform)' != 'ARM64'"
+      Text="DeskBox Rust native stage 7A supports Platform=x64, ARM64, or canonical AnyCPU without a conflicting RID." />
+    <Error
+      Condition="('$(Platform)' == 'x64' and '$(RuntimeIdentifier)' == 'win-arm64') or ('$(Platform)' == 'ARM64' and '$(RuntimeIdentifier)' == 'win-x64')"
+      Text="DeskBox Rust native stage 7A requires matching Platform and RuntimeIdentifier architectures." />
+    <Error
+      Condition="'$(DeskBoxRustNativePlatform)' == ''"
+        Text="DeskBox Rust native stage 7A could not resolve an x64 or ARM64 target." />
+    <Exec
+      Command="powershell.exe -NoProfile -ExecutionPolicy Bypass -File &quot;$(MSBuildProjectDirectory)\..\..\scripts\build-rust-native.ps1&quot; -Platform $(DeskBoxRustNativePlatform) -Configuration $(Configuration) -CrtLinkage $(DeskBoxRustCrtLinkage) -OutputDirectory &quot;$(DeskBoxRustNativeIntermediateDir)&quot; -CargoTargetDirectory &quot;$(DeskBoxRustNativeCargoTargetDir)&quot;" />
+  </Target>
+
+  <Target
+    Name="CopyDeskBoxRustNativeToOutput"
+    AfterTargets="Build"
+    DependsOnTargets="BuildDeskBoxRustNative"
+    Condition="'$(DesignTimeBuild)' != 'true' and '$(DeskBoxRustNative)' == 'true'">
+    <Copy
+      SourceFiles="$(DeskBoxRustNativeDll);$(DeskBoxRustNativePdb)"
+      DestinationFolder="$(TargetDir)"
+      SkipUnchangedFiles="true" />
+  </Target>
+
+  <Target
+    Name="CopyDeskBoxRustNativeToPublish"
+    AfterTargets="Publish"
+    DependsOnTargets="BuildDeskBoxRustNative"
+    Condition="'$(DesignTimeBuild)' != 'true' and '$(DeskBoxRustNative)' == 'true'">
+    <Copy
+      SourceFiles="$(DeskBoxRustNativeDll);$(DeskBoxRustNativePdb)"
+      DestinationFolder="$(PublishDir)"
+      SkipUnchangedFiles="true" />
+  </Target>
+
+  <!--
+    Windows App SDK's Native AOT MSIX targets package the Publish output rather
+    than blindly copying the build directory. The Rust module is generated by a
+    custom target, so register it (and its symbol file) explicitly with the
+    package payload before _ComputeAppxPackagePayload snapshots the inputs.
+
+    The .NET Native AOT executable does not consume deps.json or
+    runtimeconfig.json. Those files can still flow from the ordinary build
+    output, so remove them from the Store AOT payload instead of shipping
+    misleading managed-runtime metadata.
+  -->
+  <Target
+    Name="PrepareDeskBoxStoreNativeAotPayload"
+    BeforeTargets="_ComputeAppxPackagePayload"
+    DependsOnTargets="BuildDeskBoxRustNative"
+    Condition="'$(DesignTimeBuild)' != 'true' and '$(DeskBoxDistribution)' == 'Store' and '$(PublishAot)' == 'true' and '$(DeskBoxRustNative)' == 'true'">
+    <ItemGroup>
+      <PackagingOutputs
+        Remove="@(PackagingOutputs)"
+        Condition="'%(PackagingOutputs.TargetPath)' == 'DeskBox.deps.json' or '%(PackagingOutputs.TargetPath)' == 'DeskBox.runtimeconfig.json'" />
+      <AppxPackagePayload Include="$(DeskBoxRustNativeDll)">
+        <TargetPath>deskbox_native.dll</TargetPath>
+      </AppxPackagePayload>
+      <AppxPackagePayload Include="$(DeskBoxRustNativePdb)" Condition="Exists('$(DeskBoxRustNativePdb)')">
+        <TargetPath>deskbox_native.pdb</TargetPath>
+      </AppxPackagePayload>
+    </ItemGroup>
+  </Target>
+
+  <Target
+    Name="BuildDeskBoxThumbnailProxy"
+    BeforeTargets="CoreCompile"
+    Condition="'$(DesignTimeBuild)' != 'true' and '$(DeskBoxShellThumbnailProxy)' == 'true'"
+    Inputs="@(DeskBoxThumbnailProxyInput)"
+    Outputs="$(DeskBoxThumbnailProxyExe)">
+    <Error
+      Condition="'$(DeskBoxThumbnailProxyPlatform)' == ''"
+      Text="DeskBox thumbnail proxy could not resolve an x64 or ARM64 target." />
+    <Exec
+      Command="powershell.exe -NoProfile -ExecutionPolicy Bypass -File &quot;$(MSBuildProjectDirectory)\..\..\scripts\build-rust-thumbnail-proxy.ps1&quot; -Platform $(DeskBoxThumbnailProxyPlatform) -Configuration $(Configuration) -CrtLinkage $(DeskBoxRustCrtLinkage) -OutputDirectory &quot;$(DeskBoxThumbnailProxyIntermediateDir)&quot; -CargoTargetDirectory &quot;$(DeskBoxThumbnailProxyCargoTargetDir)&quot;" />
+  </Target>
+
+  <Target
+    Name="CopyDeskBoxThumbnailProxyToOutput"
+    AfterTargets="Build"
+    DependsOnTargets="BuildDeskBoxThumbnailProxy"
+    Condition="'$(DesignTimeBuild)' != 'true' and '$(DeskBoxShellThumbnailProxy)' == 'true'">
+    <Copy
+      SourceFiles="$(DeskBoxThumbnailProxyExe)"
+      DestinationFolder="$(TargetDir)"
+      SkipUnchangedFiles="true" />
+    <Copy
+      SourceFiles="$(DeskBoxThumbnailProxyPdb)"
+      DestinationFolder="$(TargetDir)"
+      SkipUnchangedFiles="true"
+      Condition="Exists('$(DeskBoxThumbnailProxyPdb)')" />
+  </Target>
+
+  <Target
+    Name="CopyDeskBoxThumbnailProxyToPublish"
+    AfterTargets="Publish"
+    DependsOnTargets="BuildDeskBoxThumbnailProxy"
+    Condition="'$(DesignTimeBuild)' != 'true' and '$(DeskBoxShellThumbnailProxy)' == 'true'">
+    <Copy
+      SourceFiles="$(DeskBoxThumbnailProxyExe)"
+      DestinationFolder="$(PublishDir)"
+      SkipUnchangedFiles="true" />
+    <Copy
+      SourceFiles="$(DeskBoxThumbnailProxyPdb)"
+      DestinationFolder="$(PublishDir)"
+      SkipUnchangedFiles="true"
+      Condition="Exists('$(DeskBoxThumbnailProxyPdb)')" />
+  </Target>
+
+  <Target
+    Name="PrepareDeskBoxStoreThumbnailProxyPayload"
+    BeforeTargets="_ComputeAppxPackagePayload"
+    DependsOnTargets="BuildDeskBoxThumbnailProxy"
+    Condition="'$(DesignTimeBuild)' != 'true' and '$(DeskBoxDistribution)' == 'Store' and '$(DeskBoxShellThumbnailProxy)' == 'true'">
+    <ItemGroup>
+      <AppxPackagePayload Include="$(DeskBoxThumbnailProxyExe)">
+        <TargetPath>DeskBox.ThumbnailProxy.exe</TargetPath>
+      </AppxPackagePayload>
+      <AppxPackagePayload Include="$(DeskBoxThumbnailProxyPdb)" Condition="Exists('$(DeskBoxThumbnailProxyPdb)')">
+        <TargetPath>DeskBox.ThumbnailProxy.pdb</TargetPath>
+      </AppxPackagePayload>
+    </ItemGroup>
+  </Target>
+
+</Project>

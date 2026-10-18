@@ -1,0 +1,28 @@
+{
+  "name": "sleepy",
+  "emotion": "sleepy",
+  "fps": 12,
+  "frameCount": 1,
+  "loop": true,
+  "priority": 16,
+  "mouthAnchor": {
+    "frame": 0,
+    "x": 180,
+    "y": 108
+  },
+  "transitionIn": "",
+  "transitionOut": "",
+  "canvas": {
+    "width": 420,
+    "height": 560
+  },
+  "groundY": 540,
+  "frames": [
+    {
+      "file": "0000.png",
+      "sha256": "67bf332aba771b36f7b2d8b8bf9a5df7f1d0974fae69238bac2a76ddbfb3904a"
+    }
+  ],
+  "reviewed": true,
+  "sourceSha256": "4ef1074585424d414d48d5957c590e1e4811920112cb85705b4fdb131dcc4a50"
+}

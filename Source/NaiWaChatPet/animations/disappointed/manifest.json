@@ -1,0 +1,28 @@
+{
+  "name": "disappointed",
+  "emotion": "disappointed",
+  "fps": 12,
+  "frameCount": 1,
+  "loop": true,
+  "priority": 22,
+  "mouthAnchor": {
+    "frame": 0,
+    "x": 180,
+    "y": 108
+  },
+  "transitionIn": "",
+  "transitionOut": "",
+  "canvas": {
+    "width": 420,
+    "height": 560
+  },
+  "groundY": 540,
+  "frames": [
+    {
+      "file": "0000.png",
+      "sha256": "e5cea6a103713c05d883fa36ed82197d0c7b2a8c81c0797b27734c32a80377f1"
+    }
+  ],
+  "reviewed": true,
+  "sourceSha256": "a88346a3cc6e25674374693c1c1674c8efd37f42a6037886cd37b6b465c720b9"
+}

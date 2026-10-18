@@ -1,0 +1,13 @@
+[package]
+name = "deskbox-audio-session-fixture"
+version = "0.1.0"
+edition = "2024"
+rust-version = "1.96"
+publish = false
+
+[target.'cfg(windows)'.dependencies]
+windows = { version = "0.62.2", default-features = false, features = [
+    "Win32_Foundation",
+    "Win32_Media_Audio",
+    "Win32_System_Threading",
+] }

@@ -1,0 +1,28 @@
+{
+  "name": "grateful",
+  "emotion": "grateful",
+  "fps": 12,
+  "frameCount": 1,
+  "loop": true,
+  "priority": 22,
+  "mouthAnchor": {
+    "frame": 0,
+    "x": 180,
+    "y": 108
+  },
+  "transitionIn": "",
+  "transitionOut": "",
+  "canvas": {
+    "width": 420,
+    "height": 560
+  },
+  "groundY": 540,
+  "frames": [
+    {
+      "file": "0000.png",
+      "sha256": "92e38b358837d663c8c0a41b2940d9e1baeef472b13338f0dd404d8262a20135"
+    }
+  ],
+  "reviewed": true,
+  "sourceSha256": "2eac316e8bfcc3fc28603436df41206b2cd8c6672e5bb2342c1a2c4489ae0a6c"
+}

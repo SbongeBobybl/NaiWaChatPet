@@ -1,0 +1,16 @@
+[workspace]
+members = [
+    "deskbox-native",
+    "deskbox-audio-session-fixture",
+    "deskbox-thumbnail-proxy",
+]
+resolver = "3"
+
+[profile.dev]
+panic = "abort"
+
+[profile.release]
+codegen-units = 1
+lto = "thin"
+panic = "abort"
+strip = "none"
