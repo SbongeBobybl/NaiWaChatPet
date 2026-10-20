@@ -4,7 +4,7 @@
   "skill": "skill_roll",
   "kind": "skill",
   "fps": 12,
-  "frameCount": 12,
+  "frameCount": 13,
   "loop": false,
   "priority": 40,
   "mouthAnchor": {
@@ -25,51 +25,56 @@
     },
     {
       "frame": 2,
-      "x": 140.17,
-      "y": 310.59
+      "x": 143.07,
+      "y": 352.12
     },
     {
       "frame": 3,
-      "x": 179.68,
-      "y": 324.02
+      "x": 121.66,
+      "y": 354.07
     },
     {
       "frame": 4,
-      "x": 91.95,
-      "y": 330.7
+      "x": 115.06,
+      "y": 362.81
     },
     {
       "frame": 5,
-      "x": 97.23,
-      "y": 308.23
+      "x": 115.96,
+      "y": 372.02
     },
     {
       "frame": 6,
-      "x": 100.5,
-      "y": 321.74
+      "x": 109.71,
+      "y": 379.11
     },
     {
       "frame": 7,
-      "x": 107.94,
-      "y": 331.55
+      "x": 97.55,
+      "y": 371.33
     },
     {
       "frame": 8,
-      "x": 118.17,
-      "y": 310.59
+      "x": 80.86,
+      "y": 354.92
     },
     {
       "frame": 9,
-      "x": 187.79,
-      "y": 306.81
+      "x": 63.91,
+      "y": 345.9
     },
     {
       "frame": 10,
-      "x": 133.41,
-      "y": 227.75
+      "x": 52.62,
+      "y": 350.45
     },
     {
       "frame": 11,
+      "x": 23.41,
+      "y": 227.75
+    },
+    {
+      "frame": 12,
       "x": 153.5,
       "y": 138.0
     }
@@ -92,46 +97,50 @@
     },
     {
       "file": "0002.png",
-      "sha256": "bd168a0fb7911fbcf0d6568dbd2ff7084c8d35b94c24c44bd2a939aeea548a5c"
+      "sha256": "5139c5814d1c867dd02c490c53189c22734acd0708b1374896148e4f8aba39eb"
     },
     {
       "file": "0003.png",
-      "sha256": "877d4499def9fa154a412fb4d85ee7aca74320ba56ecc658bbac12ed85a9eb57"
+      "sha256": "bddf8ca59dfd882e2d38782869d53287dfa7ce589e85d6253a99fb28af57434c"
     },
     {
       "file": "0004.png",
-      "sha256": "be927927026301249b3d457ed593ec1e19708a7b08d8d0937922d05953c094cf"
+      "sha256": "0d4352e4e08774033cb0fdb56455a8ff1daf3dec9ea7f4c12bbe0b5f34340f45"
     },
     {
       "file": "0005.png",
-      "sha256": "e8cbf9538e91b11415f53d61fc40d614dd3adb46741a95756890ca893211d4ae"
+      "sha256": "bf08dea3b21e62adb81d2cd4380cb4d9a32fa5101b958cd35cb055d2d8e512f0"
     },
     {
       "file": "0006.png",
-      "sha256": "c46e2b57a0001e673058126e80878e36f9964ab991da3252d52f3a84d8f82a58"
+      "sha256": "02d7e2640d637887de790dca0042cb4b312fe95d024baa19167008cbe5376aac"
     },
     {
       "file": "0007.png",
-      "sha256": "a016236d1272c859a75bc96c4553f46fb1c073f2ed9516164c0daf47a07f5782"
+      "sha256": "0e7d83d87c4ebc63a3d56086ca0494f6ba5ed9efcc2ffdddb1c68581dc951f17"
     },
     {
       "file": "0008.png",
-      "sha256": "8c440fbc9722bf84d18fd7c8e571605641f4cb555c3005f61c3955cdf31551ab"
+      "sha256": "458a32b896fd509673ba3af53ad8591e622613160e0edf4b83b807973e1bbbd7"
     },
     {
       "file": "0009.png",
-      "sha256": "39f77a0ffc3e1eee22b27d3e334537c85e5cabf5e15bb0a3d91da1c6c834767e"
+      "sha256": "7801bf525842a3ef504f3a6b5deafeb6d966a2b6b4310e58e3b90b60a1cf274c"
     },
     {
       "file": "0010.png",
-      "sha256": "be4a5db74c7505f8ca32ad0c3b771364e3bf8230d85a8f68aaf5e621cf549d6f"
+      "sha256": "0618a388554ae353b7f08e4c36c66c6b0b6e44750639ba30526d7945f6723a30"
     },
     {
       "file": "0011.png",
+      "sha256": "3bd14f5b24fec29e813c580972af2765f13ef77ae5f9ad01c77f86f716330ddf"
+    },
+    {
+      "file": "0012.png",
       "sha256": "cc055177b4847597a08443d299de01ef9973aa4758d012f8433733324bd0e3e2"
     }
   ],
   "reviewed": true,
-  "sourceSha256": "e63a212903b72f91e72221600a28c26512fbf72d575421811cecb1641b77995d",
+  "sourceSha256": "2e04d7ca608d15c2bcb12c04f5c854b9ed87b078f8f33d1d3af6f18a2121a73a",
   "issues": []
 }

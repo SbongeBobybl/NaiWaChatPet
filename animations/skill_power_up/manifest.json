@@ -4,8 +4,8 @@
   "skill": "skill_power_up",
   "kind": "skill",
   "fps": 12,
-  "frameCount": 9,
-  "loop": false,
+  "frameCount": 13,
+  "loop": true,
   "priority": 40,
   "mouthAnchor": {
     "frame": 0,
@@ -20,43 +20,63 @@
     },
     {
       "frame": 1,
-      "x": 148.14,
-      "y": 116.18
+      "x": 134.61,
+      "y": 71.0
     },
     {
       "frame": 2,
-      "x": 149.08,
-      "y": 107.92
+      "x": 139.28,
+      "y": 62.67
     },
     {
       "frame": 3,
-      "x": 151.32,
-      "y": 107.42
+      "x": 153.92,
+      "y": 64.82
     },
     {
       "frame": 4,
-      "x": 151.67,
-      "y": 114.19
+      "x": 161.42,
+      "y": 73.32
     },
     {
       "frame": 5,
-      "x": 149.27,
-      "y": 109.11
+      "x": 157.51,
+      "y": 80.88
     },
     {
       "frame": 6,
-      "x": 143.67,
-      "y": 89.28
+      "x": 147.99,
+      "y": 88.67
     },
     {
       "frame": 7,
-      "x": 147.09,
-      "y": 80.45
+      "x": 136.71,
+      "y": 69.95
     },
     {
       "frame": 8,
-      "x": 151.81,
-      "y": 86.28
+      "x": 138.62,
+      "y": 61.38
+    },
+    {
+      "frame": 9,
+      "x": 153.9,
+      "y": 64.63
+    },
+    {
+      "frame": 10,
+      "x": 157.15,
+      "y": 87.25
+    },
+    {
+      "frame": 11,
+      "x": 151.4,
+      "y": 91.71
+    },
+    {
+      "frame": 12,
+      "x": 141.89,
+      "y": 94.87
     }
   ],
   "transitionIn": "",
@@ -73,38 +93,54 @@
     },
     {
       "file": "0001.png",
-      "sha256": "8077f7f2da815b25491ac23fb91739f22ed0555961f98a2e07d175503d0f859e"
+      "sha256": "61e915f317d32a317ce6a2bc16f710173f9f56f6e7f94190e999072468781516"
     },
     {
       "file": "0002.png",
-      "sha256": "a64d702edcf3c16ef20175f83651caa5836c3c6d5e8ad13b65ae400e15e75c09"
+      "sha256": "723ddcbaccbabf02c4cb4aaaa2dceedbe1cd2347b77eb33a63daf6ef9623fb58"
     },
     {
       "file": "0003.png",
-      "sha256": "105e2ddef132ca19097c6ff8be3b83880ae5bde5607dcaa647d3ae1b8ff1352c"
+      "sha256": "b6a591a1d30826a901013696e919c06d3f220d8728eaf3a9f58b5a4a08111ce6"
     },
     {
       "file": "0004.png",
-      "sha256": "88b480037a5ba5e2a26a7272c90bc15c30746fb84c4d7c8a70a473d938d7e961"
+      "sha256": "f8e62e57392f5228a4e110121ea247c239497ab78193011f08626478b873c942"
     },
     {
       "file": "0005.png",
-      "sha256": "8bc524934592d431f4122b2a1ffce4b244eba29bbb8a540f084e980e1ce415fc"
+      "sha256": "05c8a34c3f20bbe880a70803d7abc212865b3d247be5f34d55bceb97430085da"
     },
     {
       "file": "0006.png",
-      "sha256": "df5102058602d2355e0a3297226574e94bd91ea3f58231822c4fbef774ee0e55"
+      "sha256": "2610e46d9d5ca32773907fbf0dff93465b2c8929847ae28fb938237e08b6e35d"
     },
     {
       "file": "0007.png",
-      "sha256": "209038a49ef74238b7fa1366876a71252758d91a224e07a69a25a59d7904401a"
+      "sha256": "5b64b44aac654ceba192628f8a1bbef49cc9388c8f245c7464c5a4f677da69c6"
     },
     {
       "file": "0008.png",
-      "sha256": "be106bd77a8f101fe91ef86268154b49defe725cfabde38f7ac4099e5ee9a6bd"
+      "sha256": "3923f3b90d6e22d295326050823ac4583057984472e5356250057171f2230c92"
+    },
+    {
+      "file": "0009.png",
+      "sha256": "7a1766f5e620339de5bf968b26cdc81a4c792c4c8d8b369745d5eed929f96453"
+    },
+    {
+      "file": "0010.png",
+      "sha256": "428f2d4c4f3b999b369ed0667a42d352421245cd8c988cbf4d75b06920cd18fc"
+    },
+    {
+      "file": "0011.png",
+      "sha256": "a7c70646630e67c127d06036457c7b37782e2539fa7cb7a81562e5360528f146"
+    },
+    {
+      "file": "0012.png",
+      "sha256": "0e80a137ab2c7e7939abe446390bc0d3a88f1c2edc5c43e1c690d0c89ada5f7e"
     }
   ],
   "reviewed": true,
-  "sourceSha256": "e1b534d6374317a68ad663bebac040331f778c9dede76a291d415e2b836c85ba",
+  "sourceSha256": "24b35b4829aff5a1fb604a276af583a018f5f381a212c245745bc11a7bce3de2",
   "issues": []
 }

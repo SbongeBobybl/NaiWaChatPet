@@ -72,9 +72,9 @@ func TestSkillClipsOpenOnReference(t *testing.T) {
 		t.Fatal(err)
 	}
 	frames := map[string]int{
-		"skill_fan_throw": 11,
-		"skill_roll":      12,
-		"skill_power_up":  9,
+		"skill_fan_throw": 14,
+		"skill_roll":      13,
+		"skill_power_up":  13,
 	}
 	legacy := legacyFrameHashes(t, root)
 	for _, sk := range skills {

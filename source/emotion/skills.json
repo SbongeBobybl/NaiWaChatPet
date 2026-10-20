@@ -5,24 +5,24 @@
       "zh": "掷扇",
       "clip": "animations/skill_fan_throw",
       "fps": 12,
-      "frame_count": 11,
-      "note": "Throws a fan off the left edge. The burst is the impact on an unseen target. No enemy is drawn. The character winds up, releases, and returns to the reference plate."
+      "frame_count": 14,
+      "note": "The arm thrusts straight forward, the way the character faces. The fan flies in a straight horizontal line and detonates off the left edge. No enemy is drawn. The clip ends on the reference plate."
     },
     {
       "id": "skill_roll",
       "zh": "翻滚",
       "clip": "animations/skill_roll",
       "fps": 12,
-      "frame_count": 12,
-      "note": "Curls into a ball, rolls by rotating that pose, then uncurls onto the reference plate."
+      "frame_count": 13,
+      "note": "Curls into a ball and rolls forward only, screen-left, with rotation matched to that travel, then uncurls onto the reference plate."
     },
     {
       "id": "skill_power_up",
       "zh": "蓄力",
       "clip": "animations/skill_power_up",
       "fps": 12,
-      "frame_count": 9,
-      "note": "Fire and glow are layers behind the reference plate. Opaque character pixels are not repainted."
+      "frame_count": 13,
+      "note": "Layered fire tongues, additive glow, rising embers, and a soft ground pool sit around the reference plate. The burn cycle loops. Opaque character pixels are not repainted."
     }
   ]
 }

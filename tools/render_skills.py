@@ -212,80 +212,172 @@ def explosion(stage: int, cx: int, cy: int) -> np.ndarray:
     return np.array(canvas)
 
 
-def fire_layer(character: np.ndarray, intensity: float, frame_i: int) -> np.ndarray:
-    """Flames and glow outside the silhouette. Interior gaps stay empty."""
+def quantize(layer: np.ndarray, step: int = 8) -> np.ndarray:
+    q = (layer // step) * step
+    q[:, :, 3] = np.where(layer[:, :, 3] < step, 0, q[:, :, 3])
+    return q.astype(np.uint8)
+
+
+def additive(base: np.ndarray, src: np.ndarray) -> np.ndarray:
+    """Add src over base. Used for flame light, not for the character."""
+    a = src[:, :, 3:4].astype(np.float32) / 255.0
+    out = base.astype(np.float32)
+    out[:, :, :3] = np.clip(out[:, :, :3] + src[:, :, :3].astype(np.float32) * a, 0, 255)
+    out[:, :, 3] = np.clip(np.maximum(out[:, :, 3], src[:, :, 3].astype(np.float32) * 0.92), 0, 255)
+    return out.astype(np.uint8)
+
+
+def ribbon(draw: ImageDraw.ImageDraw, pts: list[tuple[float, float]], widths: list[float], color: tuple[int, int, int, int]):
+    left = []
+    right = []
+    for i, ((x, y), w) in enumerate(zip(pts, widths)):
+        if i == 0:
+            dx, dy = pts[1][0] - x, pts[1][1] - y
+        elif i == len(pts) - 1:
+            dx, dy = x - pts[i - 1][0], y - pts[i - 1][1]
+        else:
+            dx = pts[i + 1][0] - pts[i - 1][0]
+            dy = pts[i + 1][1] - pts[i - 1][1]
+        norm = float(np.hypot(dx, dy)) or 1.0
+        px, py = -dy / norm * w, dx / norm * w
+        left.append((x + px, y + py))
+        right.append((x - px, y - py))
+    draw.polygon(left + right[::-1], fill=color)
+
+
+def tongue_wobble(t: float, seed: float, phase: float) -> float:
+    return (
+        np.sin(t * 3.2 + seed + phase) * 0.62
+        + np.sin(t * 7.4 + seed * 1.6 - phase * 1.35) * 0.28
+        + np.sin(t * 12.5 + seed * 0.45 + phase * 2.05) * 0.14
+    )
+
+
+def fire_layers(character: np.ndarray, frame_i: int, frame_n: int) -> tuple[np.ndarray, np.ndarray]:
+    """Behind-body fire and a hotter front lick. Shapes are rebuilt every frame."""
+    phase = 2.0 * np.pi * frame_i / frame_n
+    pulse = 0.84 + 0.16 * (0.5 + 0.5 * np.sin(phase))
     mask = (character[:, :, 3] > 80).astype(np.uint8) * 255
-    # Close the gap between the legs so the aura rings the body instead of
-    # pooling into a disc under the belly.
-    closed = cv2.morphologyEx(mask, cv2.MORPH_CLOSE, cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (47, 47)))
-    contours, _ = cv2.findContours(closed, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_NONE)
-    contour = max(contours, key=cv2.contourArea)
+    contours, _ = cv2.findContours(mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_NONE)
+    contour = max(contours, key=cv2.contourArea)[:, 0, :]
     filled = np.zeros_like(mask)
     cv2.drawContours(filled, [contour], -1, 255, thickness=-1)
-    ring = cv2.dilate(filled, cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (29, 29)))
-    ring[filled > 0] = 0
-    glow = cv2.GaussianBlur(ring, (0, 0), 12).astype(np.float32) / 255.0
-    alpha = np.clip(glow * (80 + 140 * intensity), 0, 176)
-    alpha = (alpha // 8) * 8
-    alpha[filled > 0] = 0
-    layer = np.zeros((H, W, 4), np.uint8)
-    layer[:, :, 0] = 255
-    layer[:, :, 1] = 92
-    layer[:, :, 2] = 18
-    layer[:, :, 3] = alpha.astype(np.uint8)
+    cx = float(contour[:, 0].mean())
+    cy = float(contour[:, 1].mean())
 
-    pts = contour[:, 0, :]
-    cx, cy = float(pts[:, 0].mean()), float(pts[:, 1].mean())
-    step = max(1, len(pts) // 14)
-    flames = Image.new("RGBA", (W, H), (0, 0, 0, 0))
-    draw = ImageDraw.Draw(flames)
-    for n, idx in enumerate(range(0, len(pts), step)):
-        x, y = float(pts[idx][0]), float(pts[idx][1])
-        direction = np.array([x - cx, (y - cy) * 0.55 - 28.0], np.float32)
+    anchors = []
+    step = max(1, len(contour) // 18)
+    for n, idx in enumerate(range(0, len(contour), step)):
+        x, y = float(contour[idx][0]), float(contour[idx][1])
+        direction = np.array([x - cx, (y - cy) * 0.45 - 26.0], np.float32)
         norm = float(np.linalg.norm(direction))
         if norm < 8:
             continue
         direction /= norm
-        if y > GROUND - 10 and direction[1] > 0.05:
+        if y > GROUND - 16 and direction[1] > 0.2:
             continue
-        flicker = 0.72 + 0.28 * np.sin(frame_i * 1.15 + n * 1.3)
-        length = (26 + 62 * intensity) * flicker
-        width = 10 + 7 * intensity
-        perp = np.array([-direction[1], direction[0]])
-        outer = []
-        inner_pts = []
-        for s in range(8):
-            t = s / 7
-            bulge = np.sin(t * np.pi) ** 0.55
-            rad = width * (1.0 - t) * (0.35 + 0.75 * bulge)
-            outer.append((x + direction[0] * length * t + perp[0] * rad, y + direction[1] * length * t + perp[1] * rad))
-            inner_pts.append(
-                (x + direction[0] * length * t * 0.82 + perp[0] * rad * 0.38, y + direction[1] * length * t * 0.82 + perp[1] * rad * 0.38)
-            )
-        outer.append((x + direction[0] * length, y + direction[1] * length))
-        for s in range(7, -1, -1):
-            t = s / 7
-            bulge = np.sin(t * np.pi) ** 0.55
-            rad = width * (1.0 - t) * (0.35 + 0.75 * bulge)
-            outer.append((x + direction[0] * length * t - perp[0] * rad, y + direction[1] * length * t - perp[1] * rad))
-            inner_pts.append(
-                (x + direction[0] * length * t * 0.82 - perp[0] * rad * 0.38, y + direction[1] * length * t * 0.82 - perp[1] * rad * 0.38)
-            )
-        draw.polygon(outer, fill=(255, 96, 16, int(165 + 70 * intensity)))
-        draw.polygon(inner_pts, fill=(255, 228, 140, int(150 + 80 * intensity)))
-    flame_arr = np.array(flames)
-    flame_arr[filled > 0] = 0
-    rng = np.random.default_rng(20 + frame_i)
+        anchors.append((n, x, y, direction))
+
+    body = Image.new("RGBA", (W, H), (0, 0, 0, 0))
+    hot = Image.new("RGBA", (W, H), (0, 0, 0, 0))
+    bdraw = ImageDraw.Draw(body)
+    hdraw = ImageDraw.Draw(hot)
+    for n, x, y, direction in anchors:
+        seed = n * 1.37
+        height_wave = 0.62 + 0.38 * np.sin(phase * 2.0 + seed * 1.8)
+        length = (34 + 78 * pulse) * height_wave
+        width = (8 + 7 * pulse) * (0.75 + 0.25 * np.sin(phase + seed))
+        # Tongues rise. Side anchors lean out a little; none are a copied sprite.
+        pts = []
+        for s in range(11):
+            t = s / 10
+            wobble = tongue_wobble(t, seed, phase) * width * (0.25 + t * 1.15)
+            lean = direction[0] * length * t * 0.42
+            pts.append((x + lean + wobble, y - length * (t ** 0.92) + direction[1] * length * t * 0.12))
+        outer_w = [width * (1.0 - t) ** 0.55 * (1.05 + 0.18 * np.sin(phase + seed + t * 5)) for t in np.linspace(0, 1, 11)]
+        mid_w = [w * 0.62 for w in outer_w]
+        core_w = [w * 0.28 for w in outer_w]
+        ribbon(bdraw, pts, outer_w, (176, 28, 6, int(150 * pulse)))
+        ribbon(bdraw, pts, mid_w, (255, 104, 12, int(185 * pulse)))
+        ribbon(bdraw, pts[:8], [width * 0.34 * (1 - s / 7) for s in range(8)], (255, 214, 70, int(200 * pulse)))
+        ribbon(hdraw, pts[:6], core_w[:6], (255, 248, 220, int(210 * pulse)))
+
+    flames = np.array(body)
+    cores = np.array(hot)
+    # Soft additive glow follows the tongues, then falls off.
+    glow_src = flames.copy()
+    blur_tight = cv2.GaussianBlur(glow_src, (0, 0), 5)
+    blur_wide = cv2.GaussianBlur(glow_src, (0, 0), 16)
+    wide = blur_wide.copy()
+    wide[:, :, 0] = np.clip(wide[:, :, 0].astype(np.int16) + 20, 0, 255).astype(np.uint8)
+    wide[:, :, 1] = (wide[:, :, 1].astype(np.int16) // 2).astype(np.uint8)
+    wide[:, :, 3] = (wide[:, :, 3].astype(np.float32) * 0.55).astype(np.uint8)
+    glow = additive(wide, blur_tight)
+
+    # Warm pool on the ground, wide and soft, not a white disc.
+    yy, xx = np.mgrid[0:H, 0:W]
+    feet = np.where(mask[GROUND - 30 : GROUND, :] > 0)
+    foot_x = float(feet[1].mean()) if len(feet[1]) else cx
+    nx = (xx - foot_x) / 168.0
+    ny = (yy - (GROUND - 8)) / 36.0
+    pool = np.clip(1.0 - (nx * nx + ny * ny), 0, 1) ** 1.7
+    ground = np.zeros((H, W, 4), np.uint8)
+    ground[:, :, 0] = 255
+    ground[:, :, 1] = 78
+    ground[:, :, 2] = 12
+    ground[:, :, 3] = (np.floor(pool * (55 + 40 * pulse) / 4.0) * 4).astype(np.uint8)
+    ground[filled > 0, 3] = 0
+
     embers = Image.new("RGBA", (W, H), (0, 0, 0, 0))
     edraw = ImageDraw.Draw(embers)
-    for _ in range(int(10 * intensity)):
-        ex = int(rng.integers(30, W - 30))
-        ey = int(rng.integers(60, GROUND - 16))
-        if filled[ey, ex] > 0 or character[ey, ex, 3] > 16:
+    for i in range(22):
+        life = (i / 22.0 + frame_i / frame_n) % 1.0
+        fade = np.sin(life * np.pi)
+        if fade < 0.08:
             continue
-        rad = int(rng.integers(2, 4))
-        edraw.ellipse([ex - rad, ey - rad, ex + rad, ey + rad], fill=(255, 196, 70, 190))
-    return over(over(layer, flame_arr), np.array(embers))
+        ang = i * 2.399
+        sx = cx + np.cos(ang) * 78 + np.sin(phase + i) * 10
+        sy = cy - 20 + np.sin(ang) * 90
+        ex = sx + np.sin(life * 6.2 + i) * 7
+        ey = sy - life * (64 + (i % 5) * 22)
+        if ey < 24 or not (0 <= int(ex) < W and 0 <= int(ey) < H):
+            continue
+        if filled[int(ey), int(ex)] > 0:
+            continue
+        rad = 3 if i % 3 else 4
+        hot_ember = i % 4 == 0
+        col = (255, 250, 220, int(230 * fade)) if hot_ember else (255, 140, 24, int(220 * fade))
+        edraw.ellipse([ex - rad, ey - rad * 1.4, ex + rad, ey + rad], fill=col)
+
+    behind = additive(glow, flames)
+    behind = additive(behind, ground)
+    behind = additive(behind, np.array(embers))
+    behind = heat_haze(behind, phase)
+    behind[filled > 0] = 0
+    behind = quantize(behind, 8)
+    cores[filled > 0] = 0
+    cores = quantize(cores, 8)
+    return behind, cores
+
+
+def heat_haze(layer: np.ndarray, phase: float) -> np.ndarray:
+    """Waver the fire only. The character is composited after this."""
+    ys, xs = np.mgrid[0:H, 0:W]
+    shift = np.sin(ys * 0.085 + phase) * 2.4 + np.sin(ys * 0.21 - phase * 1.5) * 1.1
+    # More haze where the flames are bright, none as a hard warp of empty corners.
+    weight = np.clip(layer[:, :, 3].astype(np.float32) / 80.0, 0, 1)
+    map_x = (xs + shift * weight).astype(np.float32)
+    map_y = ys.astype(np.float32)
+    return cv2.remap(layer, map_x, map_y, cv2.INTER_LINEAR, borderMode=cv2.BORDER_CONSTANT, borderValue=(0, 0, 0, 0))
+
+
+def lick(character: np.ndarray, behind: np.ndarray, front: np.ndarray) -> np.ndarray:
+    """Fire behind the body, hotter tips around the edge. Solid pixels stay exact."""
+    frame = under(character, behind)
+    frame = over(frame, front)
+    solid = character[:, :, 3] == 255
+    frame[solid] = character[solid]
+    return frame
 
 
 def spin_ball(ball: np.ndarray, deg: float, extra_dx: int, ground_y: int) -> np.ndarray:
@@ -307,60 +399,78 @@ def spin_ball(ball: np.ndarray, deg: float, extra_dx: int, ground_y: int) -> np.
 
 
 def build_fan(cm: dict, canon: np.ndarray) -> list[np.ndarray]:
-    windup = load_standing("skill-throw-windup.jpg", cm)
-    release = load_standing("skill-throw-release.jpg", cm)
-    follow = load_standing("skill-throw-follow.jpg", cm)
-    hand_w = throwing_hand(windup)
-    hand_r = throwing_hand(release)
-    print(f"throwing hands windup={hand_w} release={hand_r}", flush=True)
-    # Held in the raised hand, then an arc through the open air to an unseen
-    # target off the upper-left corner. The last point still clips the frame.
-    hold = (hand_w[0] - 14, hand_w[1] - 8)
-    exit_x, exit_y = -28, 22
-    path = [hold, (34, 124), (20, 82), (6, 50), (2, 34)]
-    print(f"fan path {path}", flush=True)
+    """Straight horizontal throw toward screen-left, the way the character faces."""
+    throw = load_standing("skill-throw-straight.jpg", cm)
+    x1 = bbox_of(body_mask(throw, 40))[2]
+    shift_x = max(0, (W - 12) - int(x1))
+    pose = shift(throw, shift_x, 0)
+    hand = throwing_hand(pose)
+    # Constant height. The fan leaves the forward hand and keeps going left.
+    y = hand[1]
+    start_x = hand[0] - 22
+    end_x = -36
+    path = [(int(round(x)), y) for x in np.linspace(start_x, end_x, 8)]
+    if len({p[1] for p in path}) != 1:
+        raise SystemExit(f"fan path is not horizontal: {path}")
+    if any(path[i][0] >= path[i - 1][0] for i in range(1, len(path))):
+        raise SystemExit(f"fan path does not travel forward: {path}")
+    print(f"fan hand={hand} shift={shift_x} path={path}", flush=True)
     frames = []
-    poses = [windup, release, release, follow, follow]
-    spins = [-24, 15, 55, 110, 170]
-    scales = [0.9, 0.95, 1.0, 1.05, 1.1]
-    for pose, (fx, fy), spin, scale in zip(poses, path, spins, scales):
-        frames.append(paste_center(pose, fan_sprite(spin, scale), fx, fy))
-    # The hit is off-canvas. The flash, streaks, and smoke come back into frame.
+    for i, (fx, fy) in enumerate(path):
+        # A little tumble, still a fan. The center stays on the horizontal line.
+        spin = -12 - i * 4
+        frames.append(paste_center(pose, fan_sprite(spin, 1.05), fx, fy))
+    # Impact continues that same line, just off the left edge. No enemy.
     for stage in (0, 1, 2, 3):
-        frames.append(under(canon, explosion(stage, exit_x, exit_y)))
+        boom = under(pose, explosion(stage, end_x + 16, y))
+        assert_character_intact(pose, boom, f"fan burst {stage}")
+        frames.append(boom)
     return frames
 
 
 def build_roll(cm: dict) -> list[np.ndarray]:
+    """Curl, then roll only forward (screen-left) with no-slip rotation."""
     tuck = place_shorter("skill-roll-tuck.jpg", cm, TUCK_HEIGHT)
-    ball = place_shorter("skill-roll-ball.jpg", cm, BALL_HEIGHT)
-    ground_y = int(np.where(body_mask(ball, 80))[0].max())
-    spins = [
-        (0, 0),
-        (-60, -22),
-        (-120, -44),
-        (-180, -66),
-        (-240, -66),
-        (-300, -44),
-        (-360, -22),
-        (-400, 0),
-    ]
+    ball = place_shorter("skill-roll-ball.jpg", cm, 0.46)
+    mask = body_mask(ball, 80)
+    ys, xs = np.where(mask)
+    x0, y0, y1 = int(xs.min()), int(ys.min()), int(ys.max())
+    ground_y = y1
+    radius = max((y1 - y0) / 2.0, 1.0)
+    tuck_x0 = int(np.where(body_mask(tuck, 40))[1].min())
+    # Stop before either sprite clips the left edge.
+    travel = min(10 - x0, 10 - tuck_x0)
+    if travel >= -8:
+        raise SystemExit(f"roll has no forward room, travel={travel}")
+    steps = 9
     frames = [tuck]
-    for deg, dx in spins:
+    for i in range(steps):
+        dx = int(round(travel * (i / (steps - 1))))
+        # Moving left: positive angle sends the top of the ball left with the roll.
+        # The sprite is taller than the belly it rolls on, so the contact radius
+        # is smaller than half the body height.
+        deg = -dx / (radius * 0.36) * (180.0 / np.pi)
         frames.append(spin_ball(ball, deg, dx, ground_y))
-    frames.append(tuck)
+    frames.append(shift(tuck, travel, 0))
+    print(
+        f"roll travel={travel}px radius={radius:.1f} final_deg={-travel / (radius * 0.36) * (180.0 / np.pi):.1f}",
+        flush=True,
+    )
     return frames
 
 
 def build_power(canon: np.ndarray) -> list[np.ndarray]:
-    levels = (0.22, 0.4, 0.58, 0.74, 0.88, 1.0, 1.0, 1.0)
+    frame_n = 12
     frames = []
-    for i, level in enumerate(levels, start=1):
-        frames.append(under(canon, fire_layer(canon, level, i)))
+    for i in range(frame_n):
+        behind, front = fire_layers(canon, i, frame_n)
+        frame = lick(canon, behind, front)
+        assert_character_intact(canon, frame, f"power {i}")
+        frames.append(frame)
     return frames
 
 
-def write_manifest(directory: Path, name: str, note_frames: list[tuple[int, float, float]]):
+def write_manifest(directory: Path, name: str, note_frames: list[tuple[int, float, float]], loop: bool = False):
     frames = []
     blob = bytearray()
     for path in sorted(directory.glob("*.png")):
@@ -382,7 +492,7 @@ def write_manifest(directory: Path, name: str, note_frames: list[tuple[int, floa
         "kind": "skill",
         "fps": FPS,
         "frameCount": len(frames),
-        "loop": False,
+        "loop": loop,
         "priority": 40,
         "mouthAnchor": {"frame": anchor["frame"], "x": anchor["x"], "y": anchor["y"]},
         "mouthKeyframes": keys,
@@ -412,7 +522,7 @@ def mouths_for(canon: np.ndarray, frames: list[np.ndarray]) -> list[tuple[int, f
     return out
 
 
-def render_clip(name: str, plates: list[np.ndarray], canon: np.ndarray, canon_bytes: bytes, dest_root: Path):
+def render_clip(name: str, plates: list[np.ndarray], canon: np.ndarray, canon_bytes: bytes, dest_root: Path, loop: bool = False):
     dest = dest_root / name
     if dest.exists():
         shutil.rmtree(dest)
@@ -429,7 +539,7 @@ def render_clip(name: str, plates: list[np.ndarray], canon: np.ndarray, canon_by
             save_png(plate, path)
             saved.append(plate)
     notes = mouths_for(canon, saved)
-    count = write_manifest(dest, name, notes)
+    count = write_manifest(dest, name, notes, loop=loop)
     # Frame 0 is not inside `saved`, so the manifest count includes it.
     print(f"{name}: {count} frames", flush=True)
     return count
@@ -452,7 +562,7 @@ def write_skills_json(counts: dict[str, int]):
                 "clip": "animations/skill_fan_throw",
                 "fps": FPS,
                 "frame_count": counts["skill_fan_throw"],
-                "note": "Throws a fan off the left edge. The burst is the impact on an unseen target. No enemy is drawn. The character winds up, releases, and returns to the reference plate.",
+                "note": "The arm thrusts straight forward, the way the character faces. The fan flies in a straight horizontal line and detonates off the left edge. No enemy is drawn. The clip ends on the reference plate.",
             },
             {
                 "id": "skill_roll",
@@ -460,7 +570,7 @@ def write_skills_json(counts: dict[str, int]):
                 "clip": "animations/skill_roll",
                 "fps": FPS,
                 "frame_count": counts["skill_roll"],
-                "note": "Curls into a ball, rolls by rotating that pose, then uncurls onto the reference plate.",
+                "note": "Curls into a ball and rolls forward only, screen-left, with rotation matched to that travel, then uncurls onto the reference plate.",
             },
             {
                 "id": "skill_power_up",
@@ -468,7 +578,7 @@ def write_skills_json(counts: dict[str, int]):
                 "clip": "animations/skill_power_up",
                 "fps": FPS,
                 "frame_count": counts["skill_power_up"],
-                "note": "Fire and glow are layers behind the reference plate. Opaque character pixels are not repainted.",
+                "note": "Layered fire tongues, additive glow, rising embers, and a soft ground pool sit around the reference plate. The burn cycle loops. Opaque character pixels are not repainted.",
             },
         ]
     }
@@ -525,7 +635,11 @@ def write_gifs(dest_root: Path):
     out = Path("/opt/cursor/artifacts/gifs")
     out.mkdir(parents=True, exist_ok=True)
     for skill_id in ("skill_fan_throw", "skill_roll", "skill_power_up"):
-        frames = [on_white(Image.open(p)) for p in sorted((dest_root / skill_id).glob("*.png"))]
+        paths = sorted((dest_root / skill_id).glob("*.png"))
+        # The burn is a closed cycle. Skip the locked plate so the GIF loops the fire.
+        if skill_id == "skill_power_up" and len(paths) > 1:
+            paths = paths[1:]
+        frames = [on_white(Image.open(p)) for p in paths]
         unique = [frames[0]]
         durations = [int(1000 / FPS)]
         for frame in frames[1:]:
@@ -547,14 +661,10 @@ def main(argv: list[str]):
     fan = build_fan(cm, canon)
     roll = build_roll(cm)
     power = build_power(canon)
-    for i, frame in enumerate(power, start=1):
-        assert_character_intact(canon, frame, f"power {i}")
-    for i, frame in enumerate(fan[5:], start=6):
-        assert_character_intact(canon, frame, f"fan burst {i}")
     counts = {}
     counts["skill_fan_throw"] = render_clip("skill_fan_throw", fan + [None], canon, canon_bytes, dest)
     counts["skill_roll"] = render_clip("skill_roll", roll + [None], canon, canon_bytes, dest)
-    counts["skill_power_up"] = render_clip("skill_power_up", power, canon, canon_bytes, dest)
+    counts["skill_power_up"] = render_clip("skill_power_up", power, canon, canon_bytes, dest, loop=True)
     if dest == ANIM:
         write_skills_json(counts)
         total = sum(p.stat().st_size for p in ANIM.rglob("*.png"))
