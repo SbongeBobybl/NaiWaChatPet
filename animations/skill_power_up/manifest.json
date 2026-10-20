@@ -20,63 +20,63 @@
     },
     {
       "frame": 1,
-      "x": 134.61,
-      "y": 71.0
+      "x": 153.5,
+      "y": 138.0
     },
     {
       "frame": 2,
-      "x": 139.28,
-      "y": 62.67
+      "x": 153.5,
+      "y": 138.0
     },
     {
       "frame": 3,
-      "x": 153.92,
-      "y": 64.82
+      "x": 153.5,
+      "y": 138.0
     },
     {
       "frame": 4,
-      "x": 161.42,
-      "y": 73.32
+      "x": 153.5,
+      "y": 138.0
     },
     {
       "frame": 5,
-      "x": 157.51,
-      "y": 80.88
+      "x": 153.5,
+      "y": 138.0
     },
     {
       "frame": 6,
-      "x": 147.99,
-      "y": 88.67
+      "x": 153.5,
+      "y": 138.0
     },
     {
       "frame": 7,
-      "x": 136.71,
-      "y": 69.95
+      "x": 153.5,
+      "y": 138.0
     },
     {
       "frame": 8,
-      "x": 138.62,
-      "y": 61.38
+      "x": 153.5,
+      "y": 138.0
     },
     {
       "frame": 9,
-      "x": 153.9,
-      "y": 64.63
+      "x": 153.5,
+      "y": 138.0
     },
     {
       "frame": 10,
-      "x": 157.15,
-      "y": 87.25
+      "x": 153.5,
+      "y": 138.0
     },
     {
       "frame": 11,
-      "x": 151.4,
-      "y": 91.71
+      "x": 153.5,
+      "y": 138.0
     },
     {
       "frame": 12,
-      "x": 141.89,
-      "y": 94.87
+      "x": 153.5,
+      "y": 138.0
     }
   ],
   "transitionIn": "",
@@ -93,54 +93,59 @@
     },
     {
       "file": "0001.png",
-      "sha256": "61e915f317d32a317ce6a2bc16f710173f9f56f6e7f94190e999072468781516"
+      "sha256": "84d8a1eabf29cdc5a3feab3b81e6a13b4018048455650b75c48110e20d637f20"
     },
     {
       "file": "0002.png",
-      "sha256": "723ddcbaccbabf02c4cb4aaaa2dceedbe1cd2347b77eb33a63daf6ef9623fb58"
+      "sha256": "7c59ca203a26dd7d0e6218e458864b03609683ab046635e3012220897bde3039"
     },
     {
       "file": "0003.png",
-      "sha256": "b6a591a1d30826a901013696e919c06d3f220d8728eaf3a9f58b5a4a08111ce6"
+      "sha256": "cb85dcc5f80893835616331e31a411b5535dfbd6c3fb9d78545d5f84a5ae083e"
     },
     {
       "file": "0004.png",
-      "sha256": "f8e62e57392f5228a4e110121ea247c239497ab78193011f08626478b873c942"
+      "sha256": "83b0112170a1f6e3f918e0e8f3377f8f4a3cbb40619c6e77551874e0ba878fb9"
     },
     {
       "file": "0005.png",
-      "sha256": "05c8a34c3f20bbe880a70803d7abc212865b3d247be5f34d55bceb97430085da"
+      "sha256": "65f29b003327561d554b27fd0a335df97964255bafbcd3ad85383dde86babffa"
     },
     {
       "file": "0006.png",
-      "sha256": "2610e46d9d5ca32773907fbf0dff93465b2c8929847ae28fb938237e08b6e35d"
+      "sha256": "f5da6bb28ce37a4c73cdf95fe43d7876fc0ce2470b34396ea0e66843910e35e6"
     },
     {
       "file": "0007.png",
-      "sha256": "5b64b44aac654ceba192628f8a1bbef49cc9388c8f245c7464c5a4f677da69c6"
+      "sha256": "f8a97ee24cf3e8ab0328c27d228b92dc97a8f0a801ef2613efbcf6d08dcc57ab"
     },
     {
       "file": "0008.png",
-      "sha256": "3923f3b90d6e22d295326050823ac4583057984472e5356250057171f2230c92"
+      "sha256": "c435df4b66269cb81f336bc81fd4117723aabf819d061a6a3c8d7154fe57be1f"
     },
     {
       "file": "0009.png",
-      "sha256": "7a1766f5e620339de5bf968b26cdc81a4c792c4c8d8b369745d5eed929f96453"
+      "sha256": "e2974d0c9801d746f071a37a8917191edebc35a706fe77e38ba1509c7dd2f8b0"
     },
     {
       "file": "0010.png",
-      "sha256": "428f2d4c4f3b999b369ed0667a42d352421245cd8c988cbf4d75b06920cd18fc"
+      "sha256": "a39fcfe52267d4efe2d932ffb388480296285f6308feef62303d3c3b938d05ee"
     },
     {
       "file": "0011.png",
-      "sha256": "a7c70646630e67c127d06036457c7b37782e2539fa7cb7a81562e5360528f146"
+      "sha256": "c72b33709592f797fd167613d7a885e45cf4f4ad11026d71554f0fe4b105e045"
     },
     {
       "file": "0012.png",
-      "sha256": "0e80a137ab2c7e7939abe446390bc0d3a88f1c2edc5c43e1c690d0c89ada5f7e"
+      "sha256": "d94be2bbb0e49098bc9efe177d07c0995eefc0ae87e932bc3d0df2bb486f8778"
     }
   ],
   "reviewed": true,
-  "sourceSha256": "24b35b4829aff5a1fb604a276af583a018f5f381a212c245745bc11a7bce3de2",
+  "sourceSha256": "23adf201e48e0ba4764b358e399fed3c8927ff774548d170447278b1534d6176",
+  "skeletal": {
+    "skeleton": "skeletal/naiwa.json",
+    "atlas": "skeletal/naiwa.atlas",
+    "animation": "skill_power_up"
+  },
   "issues": []
 }

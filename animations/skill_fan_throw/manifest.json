@@ -20,63 +20,63 @@
     },
     {
       "frame": 1,
-      "x": 243.7,
-      "y": 137.54
+      "x": 167.38,
+      "y": 139.19
     },
     {
       "frame": 2,
-      "x": 243.7,
-      "y": 137.54
+      "x": 179.02,
+      "y": 142.42
     },
     {
       "frame": 3,
-      "x": 243.7,
-      "y": 137.54
+      "x": 148.85,
+      "y": 133.06
     },
     {
       "frame": 4,
-      "x": 243.7,
-      "y": 137.54
+      "x": 109.17,
+      "y": 148.02
     },
     {
       "frame": 5,
-      "x": 243.7,
-      "y": 137.54
+      "x": 112.19,
+      "y": 147.89
     },
     {
       "frame": 6,
-      "x": 243.7,
-      "y": 137.54
+      "x": 116.96,
+      "y": 146.41
     },
     {
       "frame": 7,
-      "x": 243.7,
-      "y": 137.54
+      "x": 120.93,
+      "y": 145.17
     },
     {
       "frame": 8,
-      "x": 243.7,
-      "y": 137.54
+      "x": 137.56,
+      "y": 140.57
     },
     {
       "frame": 9,
-      "x": 50.23,
-      "y": 89.89
+      "x": 131.48,
+      "y": 141.62
     },
     {
       "frame": 10,
-      "x": 204.54,
-      "y": 137.9
+      "x": 143.12,
+      "y": 142.6
     },
     {
       "frame": 11,
-      "x": 243.7,
-      "y": 137.54
+      "x": 158.73,
+      "y": 140.6
     },
     {
       "frame": 12,
-      "x": 239.91,
-      "y": 137.95
+      "x": 152.74,
+      "y": 137.72
     },
     {
       "frame": 13,
@@ -98,51 +98,51 @@
     },
     {
       "file": "0001.png",
-      "sha256": "6672c275151082de8a846a168c30da5e9e28f91b2c64033460d7fb6b9e16ff34"
+      "sha256": "50d1f5396de17ebb95006e320278c0267d7ac0588db8bc7b24f74b7535804075"
     },
     {
       "file": "0002.png",
-      "sha256": "b214de957b4d0d0d91b1f8eb400b85a9184abe154fdb850870a709ebf16fe691"
+      "sha256": "4f3592e904c72796b0a9768a07f6c950eb90f93c0f463a1b1ae7aca98105cd6d"
     },
     {
       "file": "0003.png",
-      "sha256": "9666775f30441a864749b8b76dc5c9dfa41ed7419d59f56b59236291ff136860"
+      "sha256": "1f1255c0e2c69efb23e9ba1d9c21eed7f10b6c02aedf2b28ba254953a8f03b85"
     },
     {
       "file": "0004.png",
-      "sha256": "93c210cb22be69a8ea38238c85adeba7f91945d73430b51f74557336957406d1"
+      "sha256": "e73278dd876aba8d7219882d2ed2366735001bc5131079fb89bde347e9f711b8"
     },
     {
       "file": "0005.png",
-      "sha256": "fdb6aa7f11f37ed4ad8abcf1ccd1183f07256d6b945314be3fd8839c61b84c37"
+      "sha256": "0ca9dd0f6af765ec4aa960ed205b0f70c6ce2b11b016b8011d61132fb5c73d47"
     },
     {
       "file": "0006.png",
-      "sha256": "228bcb97eb98004079232c0c53fb6c9ebafecf5ffb36d6a3ba03e300bb1c5006"
+      "sha256": "5cdc55f2d50984f2531d3adb5c4e2bb509774c78112473894efc31779d606469"
     },
     {
       "file": "0007.png",
-      "sha256": "c8a3aeb22eae2488310d87659904643eb038e57831c2033b5c0f076fa5356ed4"
+      "sha256": "102132ab6ea3be82cfd9f3b6bf431973054bf61520537966e4e688892745147c"
     },
     {
       "file": "0008.png",
-      "sha256": "019f259f541341da775d99671b533b066934fbda5e5c8e68b136e6f6435631c2"
+      "sha256": "4b2eaaeab094070ee66e260946e2d4efb00a5111f29a740b81cdb6c0c9ce1de5"
     },
     {
       "file": "0009.png",
-      "sha256": "91c7f5b482eebef038c021980c8c33f74101c56c8eb72ab7287e7270cde5bf38"
+      "sha256": "c2614d4d9abf2712b300f2c382979ef975304a7bd5b6e97539fa42cf850b7897"
     },
     {
       "file": "0010.png",
-      "sha256": "3edce89ffae061bded4eed51ebfe538961c35f7f8b028bee32879c33074af37b"
+      "sha256": "5dd40b2afea224225dcdda54ffeaa2f1f3749889ffe4cdbe3192d6ede7f3f69a"
     },
     {
       "file": "0011.png",
-      "sha256": "a1822d84b8c32896e9ca2eef73837e2f596c6ca458aebfcbba632291db3cb3d6"
+      "sha256": "ff8547129ce29181f738ed6f523bf3eeefa04c52300782a434db6e7877deefdc"
     },
     {
       "file": "0012.png",
-      "sha256": "50377e326119986352eb4ba139949cc70a38b30194aca25b917f5e486077ddea"
+      "sha256": "4a8022dae5197e652cda86c767c96fd102eb10c92d4c5de42d6dcba918924379"
     },
     {
       "file": "0013.png",
@@ -150,6 +150,11 @@
     }
   ],
   "reviewed": true,
-  "sourceSha256": "5237095704e639381a3fe08749bf7d0a9aa6f32e07b480855d461c8e980d94f0",
+  "sourceSha256": "08a8aa44b68744f54f7f90e062e41fc83231dd653fe028e6cfef0680f1f7c2e2",
+  "skeletal": {
+    "skeleton": "skeletal/naiwa.json",
+    "atlas": "skeletal/naiwa.atlas",
+    "animation": "skill_fan_throw"
+  },
   "issues": []
 }

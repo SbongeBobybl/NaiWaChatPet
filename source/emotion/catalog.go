@@ -136,6 +136,17 @@ type Skill struct {
 	FPS        int    `json:"fps"`
 	FrameCount int    `json:"frame_count"`
 	Note       string `json:"note"`
+	// Skeletal optionally names the Spine animation the clip was rendered
+	// from. Playback still uses Clip; package skeletal can sample the rig.
+	Skeletal *SkillSkeletal `json:"skeletal,omitempty"`
+}
+
+// SkillSkeletal locates a skill in the Spine rig under skeletal/.
+type SkillSkeletal struct {
+	Skeleton      string `json:"skeleton"`
+	Atlas         string `json:"atlas"`
+	Animation     string `json:"animation"`
+	LoopAnimation string `json:"loop_animation,omitempty"`
 }
 
 type skillsFile struct {
