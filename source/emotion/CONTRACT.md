@@ -101,3 +101,15 @@ Canonical data is `source/emotion/emotions.json`. Clip paths are relative to the
 | hug | 拥抱 | normal | `animations/hug` | `hug_in` | `hug_out` |
 | shocked | 震住 | high | `animations/shocked` | `shocked_in` | `shocked_out` |
 <!-- EMOTION_TABLE_END -->
+
+## Skills
+
+Skills are not emotions. They are absent from `emotions.json` and from `ForcedChoices()`, and `RequestEmotion` rejects their ids. `Skills()` in `source/emotion/catalog.go` reads `source/emotion/skills.json`.
+
+Each skill is a 2D sequence at `animations/<id>/` with `kind` set to `skill`. Frame 0 is `source/emotion/neutral-reference.png` byte for byte. `skill_fan_throw` and `skill_roll` end on that same plate. Limb and body changes are drawn poses of this character. The fan, the off-screen burst, and the fire are separate layers. Power-up paints fire behind the reference plate, so opaque character pixels stay exact. No enemy is drawn. Skills do not change locomotion or the emotion scheduler.
+
+| id | 中文 | clip | frames |
+| --- | --- | --- | --- |
+| skill_fan_throw | 掷扇 | `animations/skill_fan_throw` | 11 |
+| skill_roll | 翻滚 | `animations/skill_roll` | 12 |
+| skill_power_up | 蓄力 | `animations/skill_power_up` | 9 |

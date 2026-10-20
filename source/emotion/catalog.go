@@ -6,10 +6,14 @@ import (
 	_ "embed"
 	"encoding/json"
 	"fmt"
+	"sync"
 )
 
 //go:embed emotions.json
 var catalogJSON []byte
+
+//go:embed skills.json
+var skillsJSON []byte
 
 // Priority is the emotion scheduler rank. It is not a locomotion interrupt
 // except where the contract explicitly allows a high-priority overlay to
@@ -122,6 +126,58 @@ func PlayableIDs() ([]string, error) {
 // ManifestPath is the legacy player manifest for this emotion.
 func (e Emotion) ManifestPath() string {
 	return e.Clip + "/manifest.json"
+}
+
+// Skill is a played action. It is not an emotion and is not in ForcedChoices.
+type Skill struct {
+	ID         string `json:"id"`
+	Zh         string `json:"zh"`
+	Clip       string `json:"clip"`
+	FPS        int    `json:"fps"`
+	FrameCount int    `json:"frame_count"`
+	Note       string `json:"note"`
+}
+
+type skillsFile struct {
+	Skills []Skill `json:"skills"`
+}
+
+var (
+	skillsOnce   sync.Once
+	skillsParsed skillsFile
+	skillsErr    error
+	skillByID    map[string]Skill
+)
+
+// Skills returns the skill clips. A bad skills.json does not affect the emotion catalog.
+func Skills() ([]Skill, error) {
+	skillsOnce.Do(func() {
+		skillsErr = json.Unmarshal(skillsJSON, &skillsParsed)
+		skillByID = make(map[string]Skill, len(skillsParsed.Skills))
+		for _, sk := range skillsParsed.Skills {
+			skillByID[sk.ID] = sk
+		}
+	})
+	if skillsErr != nil {
+		return nil, skillsErr
+	}
+	out := make([]Skill, len(skillsParsed.Skills))
+	copy(out, skillsParsed.Skills)
+	return out, nil
+}
+
+// SkillByID returns one skill. Emotion ids are not skills.
+func SkillByID(id string) (Skill, bool) {
+	if _, err := Skills(); err != nil {
+		return Skill{}, false
+	}
+	sk, ok := skillByID[id]
+	return sk, ok
+}
+
+// ManifestPath is the playback manifest for this skill.
+func (s Skill) ManifestPath() string {
+	return s.Clip + "/manifest.json"
 }
 
 func rank(p Priority) int {

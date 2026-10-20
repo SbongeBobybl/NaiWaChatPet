@@ -1,0 +1,110 @@
+{
+  "name": "skill_power_up",
+  "emotion": "",
+  "skill": "skill_power_up",
+  "kind": "skill",
+  "fps": 12,
+  "frameCount": 9,
+  "loop": false,
+  "priority": 40,
+  "mouthAnchor": {
+    "frame": 0,
+    "x": 153.5,
+    "y": 138.0
+  },
+  "mouthKeyframes": [
+    {
+      "frame": 0,
+      "x": 153.5,
+      "y": 138.0
+    },
+    {
+      "frame": 1,
+      "x": 148.14,
+      "y": 116.18
+    },
+    {
+      "frame": 2,
+      "x": 149.08,
+      "y": 107.92
+    },
+    {
+      "frame": 3,
+      "x": 151.32,
+      "y": 107.42
+    },
+    {
+      "frame": 4,
+      "x": 151.67,
+      "y": 114.19
+    },
+    {
+      "frame": 5,
+      "x": 149.27,
+      "y": 109.11
+    },
+    {
+      "frame": 6,
+      "x": 143.67,
+      "y": 89.28
+    },
+    {
+      "frame": 7,
+      "x": 147.09,
+      "y": 80.45
+    },
+    {
+      "frame": 8,
+      "x": 151.81,
+      "y": 86.28
+    }
+  ],
+  "transitionIn": "",
+  "transitionOut": "",
+  "canvas": {
+    "width": 420,
+    "height": 560
+  },
+  "groundY": 540,
+  "frames": [
+    {
+      "file": "0000.png",
+      "sha256": "cc055177b4847597a08443d299de01ef9973aa4758d012f8433733324bd0e3e2"
+    },
+    {
+      "file": "0001.png",
+      "sha256": "8077f7f2da815b25491ac23fb91739f22ed0555961f98a2e07d175503d0f859e"
+    },
+    {
+      "file": "0002.png",
+      "sha256": "a64d702edcf3c16ef20175f83651caa5836c3c6d5e8ad13b65ae400e15e75c09"
+    },
+    {
+      "file": "0003.png",
+      "sha256": "105e2ddef132ca19097c6ff8be3b83880ae5bde5607dcaa647d3ae1b8ff1352c"
+    },
+    {
+      "file": "0004.png",
+      "sha256": "88b480037a5ba5e2a26a7272c90bc15c30746fb84c4d7c8a70a473d938d7e961"
+    },
+    {
+      "file": "0005.png",
+      "sha256": "8bc524934592d431f4122b2a1ffce4b244eba29bbb8a540f084e980e1ce415fc"
+    },
+    {
+      "file": "0006.png",
+      "sha256": "df5102058602d2355e0a3297226574e94bd91ea3f58231822c4fbef774ee0e55"
+    },
+    {
+      "file": "0007.png",
+      "sha256": "209038a49ef74238b7fa1366876a71252758d91a224e07a69a25a59d7904401a"
+    },
+    {
+      "file": "0008.png",
+      "sha256": "be106bd77a8f101fe91ef86268154b49defe725cfabde38f7ac4099e5ee9a6bd"
+    }
+  ],
+  "reviewed": true,
+  "sourceSha256": "e1b534d6374317a68ad663bebac040331f778c9dede76a291d415e2b836c85ba",
+  "issues": []
+}

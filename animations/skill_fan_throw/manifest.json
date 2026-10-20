@@ -1,0 +1,128 @@
+{
+  "name": "skill_fan_throw",
+  "emotion": "",
+  "skill": "skill_fan_throw",
+  "kind": "skill",
+  "fps": 12,
+  "frameCount": 11,
+  "loop": false,
+  "priority": 40,
+  "mouthAnchor": {
+    "frame": 0,
+    "x": 153.5,
+    "y": 138.0
+  },
+  "mouthKeyframes": [
+    {
+      "frame": 0,
+      "x": 153.5,
+      "y": 138.0
+    },
+    {
+      "frame": 1,
+      "x": 140.78,
+      "y": 140.42
+    },
+    {
+      "frame": 2,
+      "x": 127.05,
+      "y": 138.0
+    },
+    {
+      "frame": 3,
+      "x": 99.74,
+      "y": 105.62
+    },
+    {
+      "frame": 4,
+      "x": 40.22,
+      "y": 57.63
+    },
+    {
+      "frame": 5,
+      "x": 83.13,
+      "y": 70.13
+    },
+    {
+      "frame": 6,
+      "x": 26.02,
+      "y": 52.47
+    },
+    {
+      "frame": 7,
+      "x": 11.64,
+      "y": 53.58
+    },
+    {
+      "frame": 8,
+      "x": 86.42,
+      "y": 61.17
+    },
+    {
+      "frame": 9,
+      "x": 117.7,
+      "y": 77.75
+    },
+    {
+      "frame": 10,
+      "x": 153.5,
+      "y": 138.0
+    }
+  ],
+  "transitionIn": "",
+  "transitionOut": "",
+  "canvas": {
+    "width": 420,
+    "height": 560
+  },
+  "groundY": 540,
+  "frames": [
+    {
+      "file": "0000.png",
+      "sha256": "cc055177b4847597a08443d299de01ef9973aa4758d012f8433733324bd0e3e2"
+    },
+    {
+      "file": "0001.png",
+      "sha256": "086e01ffa98ea239d45e454d286b5a74d2a80cc4ef915a83bb342664eab73549"
+    },
+    {
+      "file": "0002.png",
+      "sha256": "665d400bc948ffe8edb0eb7b7017d8254ab8a639235e423e684d8ae56927d3d9"
+    },
+    {
+      "file": "0003.png",
+      "sha256": "46e0498d7ca7876618a68304e998d7ad74e72c8faac9ed7dc6a5c151fda026c3"
+    },
+    {
+      "file": "0004.png",
+      "sha256": "99b2bfb6eeb327f057bb9d0f25fed2e97dec8dadfb091268382d2e6774106e32"
+    },
+    {
+      "file": "0005.png",
+      "sha256": "865d74ec4c8187357230564e3e99d124561fd26e4c35d931e448f26728061d77"
+    },
+    {
+      "file": "0006.png",
+      "sha256": "384346a8c359f0e3d30ea5bbe5117bfde0ddd987a823ad46332149c5ee303f4a"
+    },
+    {
+      "file": "0007.png",
+      "sha256": "745985c0b2d24b2c8e43e02ca9bf5a8af6cc1fa2e20ef56d893caed200a30867"
+    },
+    {
+      "file": "0008.png",
+      "sha256": "3fb251dee1e11a3b53ddbf3e4b50eb535a6ffa0f7781691040db37902ada19db"
+    },
+    {
+      "file": "0009.png",
+      "sha256": "ef0cc2266e57994ebda7f023e48bcdaf33993f3fe01eed9a311b354ce0076410"
+    },
+    {
+      "file": "0010.png",
+      "sha256": "cc055177b4847597a08443d299de01ef9973aa4758d012f8433733324bd0e3e2"
+    }
+  ],
+  "reviewed": true,
+  "sourceSha256": "94e4c6774d1181e6cd0e1f3d914274be3f388651a6e3f7da4f0e043ffd9f8ea6",
+  "issues": []
+}
