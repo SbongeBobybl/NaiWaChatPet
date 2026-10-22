@@ -20,7 +20,7 @@ func serverWithMock(t *testing.T, c *Client) *Server {
 	}
 	s.mu.Lock()
 	s.persistenceDisabled = true
-	s.key = "sk-test-private-key"
+	s.key = "test-credential-private"
 	c.Diagnostic = s.recordDiagnostic
 	s.client = c
 	// These legacy chat transport tests isolate the chat channel. The dual-channel

@@ -400,6 +400,9 @@ func runHost(assets *loadedAssets, options hostOptions) (err error) {
 		if r == 0 {
 			break
 		}
+		if a.play != nil && a.play.gamePanel != nil && a.play.gamePanel.lobbyMessage(&message) {
+			continue
+		}
 		if a.chat != nil && a.chat.tab(message) {
 			continue
 		}
@@ -452,7 +455,7 @@ drained:
 	if err := a.assets.Engine.Advance(now); err != nil {
 		return err
 	}
-	if a.contacts.update(a.rectangle(), a.peers) {
+	if a.contacts.update(a.rectangle(), a.peers) && !a.combatActive() {
 		if _, err := a.queue.requestLaugh(a.assets.Engine, now); err != nil {
 			return err
 		}
@@ -495,8 +498,10 @@ drained:
 		}
 		a.hoverSent = inside
 	}
-	if _, err := a.queue.service(a.assets.Engine, now); err != nil {
-		return err
+	if !a.combatActive() {
+		if _, err := a.queue.service(a.assets.Engine, now); err != nil {
+			return err
+		}
 	}
 	a.assets.Engine.DrainEvents()
 	a.stepPlay(now)
@@ -504,6 +509,9 @@ drained:
 	a.stepOrganizer()
 	a.stepTrip(now)
 	a.syncEmotions(now)
+	if a.play != nil && a.play.gamePanel != nil {
+		a.play.gamePanel.refresh()
+	}
 	replaceLatest(a.workers.poses, a.rectangle())
 	if a.chat != nil {
 		// While steering, a click on the pet only hands it the keyboard back.
@@ -520,10 +528,14 @@ drained:
 	return a.render(false)
 }
 func (a *desktopHost) render(force bool) error {
+	probeRenderStart := time.Now()
 	if a.surface == nil {
 		return nil
 	}
 	snap := a.assets.Engine.Snapshot()
+	if a.combatActive() {
+		snap = a.assets.Engine.IdleSnapshot()
+	}
 	watching := companionService != nil && companionService.ScreenActive()
 	key := renderKey{state: snap.State, frame: snap.Frame, w: a.w, h: a.h, drop: snap.DropVisible, watching: watching}
 	key.emotionClip = a.emotionView.Clip
@@ -542,7 +554,7 @@ func (a *desktopHost) render(force bool) error {
 		if err != nil {
 			return err
 		}
-		if a.emotionView.Clip != "" && !a.emotionView.Blocked {
+		if !a.combatActive() && a.emotionView.Clip != "" && !a.emotionView.Blocked {
 			if custom, customErr := a.emotionLibrary.Frame(a.emotionView.Clip, a.emotionView.Frame); customErr == nil {
 				body = custom
 				playedClip = a.emotionView.Clip
@@ -583,12 +595,12 @@ func (a *desktopHost) render(force bool) error {
 			sh := max(2, int(math.Round(7*pose.ShadowScale)))
 			shadow = &compositor.Layer{Image: ellipseShadow(sw, sh, pose.ShadowOpacity), At: image.Pt(int(math.Round(pose.X))-sw/2, int(math.Round(a.assets.Config.Drop.GroundY))-sh/2)}
 		}
-		composite := compositor.Compose(a.assets.Canvas, compositor.Layer{Image: body, At: image.Point{}}, prop, shadow)
+		composite := compositor.Compose(body.Bounds(), compositor.Layer{Image: body, At: image.Point{}}, prop, shadow)
 		if watching { // Always-visible dot on the pet while periodic screen sharing is active.
 			for dy := -7; dy <= 7; dy++ {
 				for dx := -7; dx <= 7; dx++ {
 					if dx*dx+dy*dy <= 49 {
-						px, py := a.assets.Canvas.Dx()-32+dx, 45+dy
+						px, py := composite.Bounds().Dx()-max(12, 32*composite.Bounds().Dx()/420)+dx, max(12, 45*composite.Bounds().Dy()/560)+dy
 						if image.Pt(px, py).In(composite.Bounds()) {
 							composite.SetRGBA(px, py, color.RGBA{R: 207, G: 74, B: 49, A: 255})
 						}
@@ -616,6 +628,9 @@ func (a *desktopHost) render(force bool) error {
 	if err := a.surface.Present(a.hwnd, a.x+a.jolt, a.y, a.bgra); err != nil {
 		a.reportPlayback(snap, playedClip, a.emotionView.Frame, false, "present_failed")
 		return err
+	}
+	if combatSmokeReport != "" {
+		recordCombatPresent(a, probeRenderStart)
 	}
 	a.reportPlayback(snap, playedClip, a.emotionView.Frame, true, "presented")
 	actualClip := playedClip
@@ -1083,6 +1098,25 @@ func windowProc(hwnd, msg, wParam, lParam uintptr) (result uintptr) {
 	switch uint32(msg) {
 	case wmTimer:
 		if wParam == 1 && !a.closing {
+			// Keep the clock claimed through rendering, not just simulation.
+			// Otherwise an expensive frame continuously queues another posted
+			// message, starving Windows' lower-priority hardware input queue.
+			if a.play != nil && a.play.fight != nil && a.play.fight.upgraded != nil {
+				clock := a.play.fight.upgraded.clock
+				if clock != nil {
+					if clock.rendering {
+						return 0
+					}
+					clock.rendering = true
+					defer func() {
+						clock.rendering = false
+						select {
+						case clock.presented <- struct{}{}:
+						default:
+						}
+					}()
+				}
+			}
 			err = a.tick()
 		}
 	case wmLeftDown:

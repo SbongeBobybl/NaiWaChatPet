@@ -160,13 +160,13 @@ func TestTimeoutCancellationAndSafeDiagnostics(t *testing.T) {
 	defer s.Close()
 	ctx, cancel := context.WithTimeout(context.Background(), 20*time.Millisecond)
 	defer cancel()
-	_, e := c.Complete(ctx, "sk-test-key", RequestOptions{Model: "deepseek-flash"}, nil, nil)
+	_, e := c.Complete(ctx, "test-credential-key", RequestOptions{Model: "deepseek-flash"}, nil, nil)
 	if errorCode(t, e) != "timeout" {
 		t.Fatal(e)
 	}
 	ctx, cancel = context.WithCancel(context.Background())
 	cancel()
-	_, e = c.Complete(ctx, "sk-test-key", RequestOptions{Model: "deepseek-flash"}, nil, nil)
+	_, e = c.Complete(ctx, "test-credential-key", RequestOptions{Model: "deepseek-flash"}, nil, nil)
 	if errorCode(t, e) != "cancelled" {
 		t.Fatal(e)
 	}

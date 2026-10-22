@@ -1,0 +1,151 @@
+{
+  "name": "skill_power_up",
+  "emotion": "",
+  "skill": "skill_power_up",
+  "kind": "skill",
+  "fps": 12,
+  "frameCount": 13,
+  "loop": true,
+  "priority": 40,
+  "mouthAnchor": {
+    "frame": 0,
+    "x": 153.5,
+    "y": 138.0
+  },
+  "mouthKeyframes": [
+    {
+      "frame": 0,
+      "x": 153.5,
+      "y": 138.0
+    },
+    {
+      "frame": 1,
+      "x": 153.5,
+      "y": 138.0
+    },
+    {
+      "frame": 2,
+      "x": 153.5,
+      "y": 138.0
+    },
+    {
+      "frame": 3,
+      "x": 153.5,
+      "y": 138.0
+    },
+    {
+      "frame": 4,
+      "x": 153.5,
+      "y": 138.0
+    },
+    {
+      "frame": 5,
+      "x": 153.5,
+      "y": 138.0
+    },
+    {
+      "frame": 6,
+      "x": 153.5,
+      "y": 138.0
+    },
+    {
+      "frame": 7,
+      "x": 153.5,
+      "y": 138.0
+    },
+    {
+      "frame": 8,
+      "x": 153.5,
+      "y": 138.0
+    },
+    {
+      "frame": 9,
+      "x": 153.5,
+      "y": 138.0
+    },
+    {
+      "frame": 10,
+      "x": 153.5,
+      "y": 138.0
+    },
+    {
+      "frame": 11,
+      "x": 153.5,
+      "y": 138.0
+    },
+    {
+      "frame": 12,
+      "x": 153.5,
+      "y": 138.0
+    }
+  ],
+  "transitionIn": "",
+  "transitionOut": "",
+  "canvas": {
+    "width": 420,
+    "height": 560
+  },
+  "groundY": 540,
+  "frames": [
+    {
+      "file": "0000.png",
+      "sha256": "cc055177b4847597a08443d299de01ef9973aa4758d012f8433733324bd0e3e2"
+    },
+    {
+      "file": "0001.png",
+      "sha256": "84d8a1eabf29cdc5a3feab3b81e6a13b4018048455650b75c48110e20d637f20"
+    },
+    {
+      "file": "0002.png",
+      "sha256": "7c59ca203a26dd7d0e6218e458864b03609683ab046635e3012220897bde3039"
+    },
+    {
+      "file": "0003.png",
+      "sha256": "cb85dcc5f80893835616331e31a411b5535dfbd6c3fb9d78545d5f84a5ae083e"
+    },
+    {
+      "file": "0004.png",
+      "sha256": "83b0112170a1f6e3f918e0e8f3377f8f4a3cbb40619c6e77551874e0ba878fb9"
+    },
+    {
+      "file": "0005.png",
+      "sha256": "65f29b003327561d554b27fd0a335df97964255bafbcd3ad85383dde86babffa"
+    },
+    {
+      "file": "0006.png",
+      "sha256": "f5da6bb28ce37a4c73cdf95fe43d7876fc0ce2470b34396ea0e66843910e35e6"
+    },
+    {
+      "file": "0007.png",
+      "sha256": "f8a97ee24cf3e8ab0328c27d228b92dc97a8f0a801ef2613efbcf6d08dcc57ab"
+    },
+    {
+      "file": "0008.png",
+      "sha256": "c435df4b66269cb81f336bc81fd4117723aabf819d061a6a3c8d7154fe57be1f"
+    },
+    {
+      "file": "0009.png",
+      "sha256": "e2974d0c9801d746f071a37a8917191edebc35a706fe77e38ba1509c7dd2f8b0"
+    },
+    {
+      "file": "0010.png",
+      "sha256": "a39fcfe52267d4efe2d932ffb388480296285f6308feef62303d3c3b938d05ee"
+    },
+    {
+      "file": "0011.png",
+      "sha256": "c72b33709592f797fd167613d7a885e45cf4f4ad11026d71554f0fe4b105e045"
+    },
+    {
+      "file": "0012.png",
+      "sha256": "d94be2bbb0e49098bc9efe177d07c0995eefc0ae87e932bc3d0df2bb486f8778"
+    }
+  ],
+  "reviewed": true,
+  "sourceSha256": "23adf201e48e0ba4764b358e399fed3c8927ff774548d170447278b1534d6176",
+  "skeletal": {
+    "skeleton": "skeletal/naiwa.json",
+    "atlas": "skeletal/naiwa.atlas",
+    "animation": "skill_power_up"
+  },
+  "issues": []
+}

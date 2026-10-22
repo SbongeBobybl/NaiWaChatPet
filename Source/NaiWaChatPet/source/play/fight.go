@@ -74,10 +74,10 @@ type Rival struct {
 }
 
 var Rivals = []Rival{
-	{"shadow", "暗影奶蛙", "SHADOW", 60, .85, .45, .15, [3][3]float64{{.08, .04, .14}, {.36, .18, .55}, {.80, .64, .98}}, false},
-	{"flame", "火焰奶蛙", "FLAME", 80, .95, .60, .20, [3][3]float64{{.22, .03, .02}, {.86, .25, .06}, {1, .84, .40}}, false},
-	{"frost", "寒冰奶蛙", "FROST", 100, 1.0, .65, .35, [3][3]float64{{.02, .10, .22}, {.22, .58, .86}, {.86, .97, 1}}, false},
-	{"gold", "黄金奶蛙", "GOLD", 140, 1.1, .80, .25, [3][3]float64{{.24, .14, .02}, {.86, .64, .12}, {1, .97, .80}}, true},
+	{"shadow", "暗影奶蛙", "SHADOW", 48, .85, .45, .15, [3][3]float64{{.08, .04, .14}, {.36, .18, .55}, {.80, .64, .98}}, false},
+	{"flame", "火焰奶蛙", "FLAME", 64, .95, .60, .20, [3][3]float64{{.22, .03, .02}, {.86, .25, .06}, {1, .84, .40}}, false},
+	{"frost", "寒冰奶蛙", "FROST", 80, 1.0, .65, .35, [3][3]float64{{.02, .10, .22}, {.22, .58, .86}, {.86, .97, 1}}, false},
+	{"gold", "黄金奶蛙", "GOLD", 112, 1.1, .80, .25, [3][3]float64{{.24, .14, .02}, {.86, .64, .12}, {1, .97, .80}}, true},
 }
 
 // RivalFor is the opponent of a round. After the boss the order repeats,
@@ -99,8 +99,8 @@ const (
 	// Rivals hit a little softer than the pet: it is the hero.
 	RivalJab   = 5.0
 	RivalHeavy = 11.0
-	PetHP      = 100.0
-	RoundTime  = 60.0
+	PetHP      = 80.0
+	RoundTime  = 120.0
 )
 
 // Reaches reports whether a palm at (px, py) lands on a fighter standing with

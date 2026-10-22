@@ -27,6 +27,7 @@ const (
 // rivalState is the opponent of the current round: a recoloured pet in a
 // window of its own, driven by the same controller as the pet.
 type rivalState struct {
+	override *play.FighterState
 	ctl      *play.Controller
 	brain    *play.Brain
 	rival    play.Rival
@@ -52,11 +53,12 @@ type dropState struct {
 }
 
 type fightState struct {
-	arena   *play.Arena
-	foe     *rivalState
-	rng     *rand.Rand
-	hitstop float64
-	slow    float64
+	upgraded *combatPresentation
+	arena    *play.Arena
+	foe      *rivalState
+	rng      *rand.Rand
+	hitstop  float64
+	slow     float64
 	// Who got knocked out, until they land and lie still.
 	koPet  bool
 	endAt  time.Duration
@@ -112,14 +114,31 @@ func (a *desktopHost) autoInput(f *fightState) play.Input {
 // screen and the round announcement.
 func (a *desktopHost) startFight() {
 	p := a.play
-	if p == nil || p.fight != nil || p.class == nil || a.assets.Engine.Snapshot().State != animation.Idle {
+	if p == nil || p.fight != nil || p.class == nil {
 		return
 	}
-	a.setControl(true)
 	p.swarm.Reset()
-	f := &fightState{arena: play.NewArena(), rng: rand.New(rand.NewSource(time.Now().UnixNano()))}
+	core := play.NewCombat(true)
+	if combatRulesPath != "" {
+		rules, err := play.ReadCombatRules(combatRulesPath)
+		if err != nil {
+			a.combatStartError(fmt.Errorf("读取战斗配置失败：%w", err))
+			return
+		}
+		core, err = play.NewConfiguredCombat(true, &rules)
+		if err != nil {
+			a.combatStartError(fmt.Errorf("战斗配置无效：%w", err))
+			return
+		}
+	}
+	core.SetWeapon(0, p.settings.Equipped)
+	core.SetAI(1, play.NewCombatAI(time.Now().UnixNano(), p.settings.Game.Difficulty))
+	f := &fightState{arena: core.Arena, rng: rand.New(rand.NewSource(time.Now().UnixNano())), upgraded: newCombatPresentation(core)}
 	p.fight = f
-	a.say("擂台挑战开始！J 出掌、K 跳，三连击最后一下是重掌。\n打倒对手可能掉落武器，走过去就能捡起来。Esc 退出。")
+	a.suspendAmbientForCombat(a.now())
+	a.setControl(true)
+	a.startCombatClock(f.upgraded)
+	a.warmCombatVFX(f.upgraded)
 }
 
 // spawnRival brings in this round's opponent from the side away from the pet.
@@ -167,8 +186,24 @@ func (a *desktopHost) endFight() {
 	if f == nil {
 		return
 	}
-	p.fight = nil
 	a.dropRival()
+	f.closeCombat()
+	p.fight = nil
+	a.resumeAmbientAfterCombat(a.now())
+	for _, e := range p.effects {
+		e.sprite.close()
+	}
+	p.effects = nil
+	p.ctl.Halt()
+	p.view = play.View{Still: true, FacingRight: p.flip}
+	if f.upgraded != nil && f.upgraded.windowReduced && !a.closing {
+		x, y := a.feetX(), a.groundLine()
+		if err := a.resize(f.upgraded.originalScale, f.upgraded.originalDPI); err != nil {
+			_, _ = logDiagnostic(err)
+		}
+		x, y = clampTo(a.standArea(), x, y)
+		a.placeFeet(x, y, 0, p.flip)
+	}
 	f.hud.close()
 	f.banner.close()
 	f.combo.close()
@@ -263,7 +298,9 @@ func (a *desktopHost) announce(e play.ArenaEvent, now time.Duration) {
 	f := a.play.fight
 	switch e {
 	case play.AnnounceRound:
-		a.spawnRival()
+		if f.upgraded == nil {
+			a.spawnRival()
+		}
 		a.banner(fmt.Sprintf("ROUND %d", f.arena.Round), goldBanner, now, 1300*time.Millisecond)
 	case play.AnnounceFight:
 		a.banner("FIGHT!", fireBanner, now, 900*time.Millisecond)
@@ -291,6 +328,9 @@ func (a *desktopHost) banner(text string, style bannerStyle, now, life time.Dura
 func (a *desktopHost) petStrikes(x, y float64, hard bool, now time.Duration) bool {
 	p := a.play
 	f := p.fight
+	if f.upgraded != nil {
+		return false
+	}
 	foe := f.foe
 	if !f.arena.Live() || foe == nil || foe.down {
 		return false
@@ -336,6 +376,9 @@ func (a *desktopHost) petStrikes(x, y float64, hard bool, now time.Duration) boo
 func (a *desktopHost) rivalStrikes(hard bool, now time.Duration) {
 	p := a.play
 	f := p.fight
+	if f.upgraded != nil {
+		return
+	}
 	foe := f.foe
 	if !f.arena.Live() || foe == nil {
 		return
@@ -416,6 +459,15 @@ func (a *desktopHost) drawRival(now time.Duration) {
 	v := foe.ctl.View()
 	fx, fy := foe.ctl.Position()
 	x, y := a.rivalWindow(fx, fy, v)
+	if foe.override != nil {
+		v = foe.override.View
+		if foe.override.Action.Skill != play.NoSkill {
+			v.Still = false
+		}
+		v.Height = foe.override.Height * a.factor()
+		fx, fy = p.fight.upgraded.viewport.Point(foe.override.X, foe.override.Y)
+		x, y = a.rivalWindow(fx, fy, v)
+	}
 	if foe.fade >= 1 {
 		foe.win.hide()
 		foe.shadow.hide()
@@ -423,19 +475,24 @@ func (a *desktopHost) drawRival(now time.Duration) {
 	}
 	// Redraw at most thirty times a second while it moves, at once when it
 	// starts, stops or changes rig, and whenever a flash or fade is running.
-	changed := v != foe.drawn || foe.flash > 0 || foe.fade > 0 || !foe.win.shown
-	if changed && (now-foe.drawnAt >= 30*time.Millisecond || v.Still != foe.drawn.Still || v.Stance != foe.drawn.Stance || !foe.win.shown) {
+	changed := v != foe.drawn || foe.flash > 0 || foe.fade > 0 || !foe.win.shown || foe.override != nil && foe.override.Action.Skill != play.NoSkill
+	if changed {
 		var frame *image.NRGBA
 		var err error
-		if v.Stance {
+		if foe.override != nil && foe.override.Action.Skill >= play.FanSkill && foe.override.Action.Skill <= play.DodgeSkill && p.fight.upgraded.core.Definition(foe.override.Action.Skill).Clip != "" {
+			frame, err = a.cachedCombatSkillFrame(foe.override.Action.Skill, foe.override.Action.Age)
+			if err == nil {
+				frame = recolour(frame, foe.rival.Palette)
+			}
+		} else if v.Stance {
 			var tex *rig.Texture
 			if tex, err = foe.texture("fight", func() (*image.NRGBA, error) { return a.assets.Bodies.BodyCopy(string(animation.Fight), 12) }); err == nil {
-				frame, err = p.stance.Render(tex, rig.StrikePose(v.Strike, v.Power).Add(rig.Settle(p.stance, v.Settle)))
+				frame, err = p.stance.RenderSized(tex, rig.StrikePose(v.Strike, v.Power).Add(rig.Settle(p.stance, v.Settle)), a.w, a.h)
 			}
 		} else {
 			var tex *rig.Texture
 			if tex, err = foe.texture("idle", func() (*image.NRGBA, error) { return a.assets.Bodies.BodyCopy(string(animation.Idle), 0) }); err == nil {
-				frame, err = p.stand.Render(tex, rig.StandPose(v.Gait))
+				frame, err = p.stand.RenderSized(tex, rig.StandPose(v.Gait), a.w, a.h)
 			}
 		}
 		if err != nil {
@@ -544,11 +601,20 @@ func (a *desktopHost) drawArena(now time.Duration) {
 	r := f.arena.Rival
 	colour := r.Palette[1]
 	key := fmt.Sprintf("%d|%.0f|%.0f|%.0f|%.0f|%d|%d", hudW, f.arena.PetHP, f.arena.PetShown, f.arena.FoeHP, f.arena.FoeShown, int(math.Ceil(f.arena.Clock)), f.arena.Round)
+	if f.upgraded != nil {
+		key += fmt.Sprintf("|%d|%s", f.upgraded.snapshot.Tick/3, f.upgraded.status)
+	}
 	if f.hud == nil {
 		f.hud, _ = p.class.open()
 	}
 	if key != f.hudKey {
-		pix, h := hudSprite(hudW, f.arena.PetHP/play.PetHP, f.arena.PetShown/play.PetHP, f.arena.FoeHP/r.HP, f.arena.FoeShown/r.HP, int(math.Ceil(f.arena.Clock)), f.arena.Round, r.Tag, colour)
+		var pix []byte
+		var h int
+		if f.upgraded != nil {
+			pix, h = combatHUDSprite(hudW, f.upgraded.snapshot, p.settings.Game.Keys, f.upgraded.localPlayer, f.upgraded.status)
+		} else {
+			pix, h = hudSprite(hudW, f.arena.PetHP/play.PetHP, f.arena.PetShown/play.PetHP, f.arena.FoeHP/r.HP, f.arena.FoeShown/r.HP, int(math.Ceil(f.arena.Clock)), f.arena.Round, r.Tag, colour)
+		}
 		if f.hud.draw(left, int(work.Top)+10, hudW, h, pix) == nil {
 			f.hudKey = key
 		}
@@ -621,12 +687,22 @@ func (a *desktopHost) weaponMenu(menu uintptr) {
 // fightCommand handles the arena's menu entries.
 func (a *desktopHost) fightCommand(command uintptr) bool {
 	p := a.play
+	if a.combatCommand(command) {
+		return true
+	}
 	switch {
 	case command == menuFight:
-		if p.fight != nil {
+		if p.fight != nil && p.fight.upgraded.address != "" {
 			a.endFight()
-		} else {
+		}
+		if p.fight == nil {
 			a.startFight()
+		} else if p.gamePanel != nil {
+			p.gamePanel.resume()
+		} else {
+			p.fight.upgraded.paused = false
+			_, _ = call(foregroundWindow, a.hwnd)
+			_, _ = call(chatSetFocus, a.hwnd)
 		}
 	case command == menuWeapon:
 		p.settings.Equipped = ""

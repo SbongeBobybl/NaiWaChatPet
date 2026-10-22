@@ -16,7 +16,7 @@ func (s *Server) DesktopInputVisible(visible bool) {
 func (s *Server) startProactive(manual bool, now time.Time) {
 	s.mu.Lock()
 	allowed := manual || s.settings.Proactive
-	if !allowed || s.busy || s.desktopInputVisible || !manual && s.desktopReplyVisible {
+	if !allowed || s.desktopGameActive || s.busy || s.desktopInputVisible || !manual && s.desktopReplyVisible {
 		s.mu.Unlock()
 		return
 	}
@@ -36,7 +36,7 @@ func (s *Server) startProactive(manual bool, now time.Time) {
 		return
 	}
 	s.mu.Lock()
-	if (!manual && !s.settings.Proactive) || s.generation != j.generation {
+	if s.desktopGameActive || (!manual && !s.settings.Proactive) || s.generation != j.generation {
 		j.cancel()
 		s.mu.Unlock()
 		_, _ = s.run(j, nil)
@@ -79,14 +79,14 @@ func (s *Server) runProactive(j *chatJob, manual bool, now time.Time, recent []s
 	result, err := c.Complete(j.ctx, j.key, RequestOptions{RequestID: j.id + "-companionship", Model: j.model, Stream: true, Thinking: false, ThinkingParameter: j.thinkingParameter, MaxTokens: 384}, messages, func(delta string) {
 		assembled.WriteString(delta)
 		s.mu.Lock()
-		if s.activeID == j.id && s.generation == j.generation && (manual || s.settings.Proactive) {
+		if !s.desktopGameActive && s.activeID == j.id && s.generation == j.generation && (manual || s.settings.Proactive) {
 			s.view = ReplyView{RequestID: j.id, Stage: "streaming", Text: assembled.String(), UpdatedAt: time.Now()}
 		}
 		s.mu.Unlock()
 	})
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	if s.activeID != j.id || s.generation != j.generation || !manual && !s.settings.Proactive {
+	if s.desktopGameActive || j.ctx.Err() == context.Canceled || s.activeID != j.id || s.generation != j.generation || !manual && !s.settings.Proactive {
 		return
 	}
 	text := strings.TrimSpace(result.Text)

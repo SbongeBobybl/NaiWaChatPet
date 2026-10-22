@@ -54,6 +54,16 @@ func (a *desktopHost) syncEmotions(now time.Duration) {
 	if a.emotions == nil {
 		return
 	}
+	if a.combatActive() {
+		// Consume ambient requests without playing or replaying stale gestures
+		// after combat. Player chat remains available through its normal UI.
+		if companionService != nil {
+			a.lastEmotionRequest = companionService.EmotionDebug().Model.RequestID
+			_, a.lastLocalSequence, _ = companionService.LocalActionDetails()
+		}
+		a.emotionView = a.emotions.Advance(now, true)
+		return
+	}
 	snap := a.assets.Engine.Snapshot()
 	// Expressions wait while the pet is walking, jumping or striking.
 	moving := a.play != nil && a.play.ctl.Busy()

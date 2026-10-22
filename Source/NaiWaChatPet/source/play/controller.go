@@ -36,9 +36,10 @@ const (
 // Input is the key state for one step. Pressed fields are true only on the
 // step in which the key went down.
 type Input struct {
-	Left, Right, Up, Down, Run bool
-	Jump, Attack               bool
-	JumpPressed, AttackPressed bool
+	Left, Right, Up, Down, Run                          bool
+	Jump, Attack                                        bool
+	JumpPressed, AttackPressed                          bool
+	FanPressed, RollPressed, PowerPressed, DodgePressed bool
 }
 
 func (in Input) steering() bool { return in.Left || in.Right || in.Up || in.Down }
@@ -58,8 +59,9 @@ const (
 // Config ties the controller to a screen. Free reports whether the pet may
 // stand with its feet at a point; nil allows everything.
 type Config struct {
-	Unit float64
-	Free func(x, y float64) bool
+	Unit   float64
+	Combat bool // responsive battle movement; desktop behaviour stays unchanged
+	Free   func(x, y float64) bool
 }
 
 type action int
@@ -75,6 +77,7 @@ const (
 // Controller holds the pet's feet position in screen pixels and its height
 // above that point in canvas pixels.
 type Controller struct {
+	weapon       Weapon
 	cfg          Config
 	x, y, vx, vy float64
 	z, vz        float64
@@ -104,7 +107,7 @@ type goal struct {
 }
 
 func New(cfg Config) *Controller {
-	c := &Controller{facing: -1, airJumps: 1}
+	c := &Controller{facing: -1, airJumps: 1, weapon: Bare}
 	c.Configure(cfg)
 	return c
 }
@@ -128,7 +131,7 @@ func (c *Controller) Place(x, y float64, facing int) {
 
 // Halt drops everything in progress and stands the pet where it is.
 func (c *Controller) Halt() {
-	*c = Controller{cfg: c.cfg, x: c.x, y: c.y, facing: c.facing, airJumps: 1}
+	*c = Controller{cfg: c.cfg, x: c.x, y: c.y, facing: c.facing, airJumps: 1, weapon: c.weapon}
 }
 
 // Goto walks or runs to a point unaided. Any steering input cancels it.
@@ -178,9 +181,17 @@ func (c *Controller) Step(dt float64, in Input) {
 	}
 	if c.stun > 0 || c.down {
 		c.stun = math.Max(0, c.stun-dt)
+		if c.stun < 1e-9 {
+			c.stun = 0
+		}
 		in = Input{}
 	}
 	grounded := c.grounded()
+	if c.cfg.Combat && c.stun == 0 && !c.down && !in.AttackPressed && (in.steering() || in.JumpPressed) && c.MovementUnlocked() {
+		if c.act != actNone {
+			c.CancelAction()
+		}
+	}
 	dx, dy := axis(in.Left, in.Right), axis(in.Up, in.Down)
 	if c.act != actNone && grounded {
 		dx, dy = 0, 0
@@ -202,6 +213,9 @@ func (c *Controller) Step(dt float64, in Input) {
 	settle := .07
 	if !grounded {
 		settle = .16
+	}
+	if c.cfg.Combat {
+		settle = combatSettle(grounded, c.vx, c.vy, wantX, wantY)
 	}
 	blend := 1 - math.Exp(-dt/settle)
 	c.vx += (wantX - c.vx) * blend

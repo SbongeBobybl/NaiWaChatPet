@@ -83,10 +83,11 @@ var quickEmotes = [10]string{"dizzy", "greet", "cheer", "celebrate", "proud", "r
 
 // playSettings is what control mode remembers between runs.
 type playSettings struct {
-	Flies  bool `json:"flies"`
-	Stroll bool `json:"stroll"`
-	Best   int  `json:"best"`
-	Hinted bool `json:"hinted"`
+	Game   *play.GameSettings `json:"game,omitempty"`
+	Flies  bool               `json:"flies"`
+	Stroll bool               `json:"stroll"`
+	Best   int                `json:"best"`
+	Hinted bool               `json:"hinted"`
 	// The arena: weapons owned by ID, the one in hand, and the record.
 	Weapons   map[string]int `json:"weapons,omitempty"`
 	Equipped  string         `json:"equipped,omitempty"`
@@ -95,6 +96,7 @@ type playSettings struct {
 }
 
 type effect struct {
+	kind   string
 	sprite *sprite
 	x, y   float64
 	born   time.Duration
@@ -108,6 +110,9 @@ type effect struct {
 // playState is everything the host keeps for steering the pet, the fly game
 // and the rigs that draw both.
 type playState struct {
+	skillEdges            [4]bool
+	bindAction            string
+	gamePanel             *gamePanel
 	carrying              []string
 	carrySquash           float64
 	ctl                   *play.Controller
@@ -178,6 +183,11 @@ func loadPlaySettings() playSettings {
 		}
 	}
 	s.Best = max(0, s.Best)
+	if s.Game == nil {
+		g := play.DefaultGameSettings()
+		s.Game = &g
+	}
+	s.Game.Normalize()
 	return s
 }
 
@@ -231,6 +241,12 @@ func (a *desktopHost) initPlay(module uintptr) {
 func (p *playState) close(hwnd uintptr) {
 	if p == nil {
 		return
+	}
+	if p.fight != nil {
+		p.fight.closeCombat()
+	}
+	if p.gamePanel != nil {
+		p.gamePanel.close()
 	}
 	if p.hotControl {
 		_, _ = call(playUnregister, hwnd, hotkeyControl)
@@ -350,6 +366,10 @@ func (p *playState) poll() play.Input {
 		}
 		return false
 	}
+	if p.fight != nil && p.fight.upgraded != nil {
+		k := p.settings.Game.Keys
+		return play.Input{Left: down(vkLeft, uintptr(k["left"])), Right: down(vkRight, uintptr(k["right"])), Up: down(vkUp, uintptr(k["up"])), Down: down(vkDown, uintptr(k["down"])), Run: down(uintptr(k["run"])), Jump: down(vkSpace, uintptr(k["jump"])), Attack: down(uintptr(k["attack"])), JumpPressed: p.jumpEdge, AttackPressed: p.attackEdge, FanPressed: p.skillEdges[0], RollPressed: p.skillEdges[1], PowerPressed: p.skillEdges[2], DodgePressed: p.skillEdges[3]}
+	}
 	return play.Input{Left: down(vkLeft, 'A'), Right: down(vkRight, 'D'), Up: down(vkUp, 'W'), Down: down(vkDown, 'S'), Run: down(vkShift),
 		Jump: down('K', vkSpace), Attack: down('J'), JumpPressed: p.jumpEdge, AttackPressed: p.attackEdge}
 }
@@ -360,6 +380,63 @@ func (a *desktopHost) playKey(key uintptr, repeat bool) bool {
 	p := a.play
 	if p == nil {
 		return false
+	}
+	if a.chat != nil && a.chat.inputVisible {
+		return false
+	}
+	if p.bindAction != "" && !repeat {
+		action := p.bindAction
+		p.bindAction = ""
+		if err := p.settings.Game.Bind(action, uint16(key)); err != nil {
+			a.say("按键未修改：" + err.Error())
+		} else {
+			p.save()
+			a.say("游戏按键已保存。")
+		}
+		return true
+	}
+	if p.fight != nil && p.fight.upgraded != nil {
+		if key == vkEscape {
+			if repeat {
+				return true
+			}
+			u := p.fight.upgraded
+			if u.client == nil && !u.connecting {
+				u.paused = !u.paused
+			}
+			a.openGamePanel()
+			return true
+		}
+		for action, k := range p.settings.Game.Keys {
+			if key != uintptr(k) {
+				continue
+			}
+			if repeat {
+				return true
+			}
+			switch action {
+			case "attack":
+				p.attackEdge = true
+			case "jump":
+				p.jumpEdge = true
+			case "fan":
+				p.skillEdges[0] = true
+			case "roll":
+				p.skillEdges[1] = true
+			case "power":
+				p.skillEdges[2] = true
+			case "dodge":
+				p.skillEdges[3] = true
+			}
+			return true
+		}
+		if key == vkSpace && !repeat {
+			p.jumpEdge = true
+			return true
+		}
+		if key == 'J' || key == 'K' {
+			return false
+		}
 	}
 	steer := key == vkLeft || key == vkRight || key == vkUp || key == vkDown || key == 'W' || key == 'A' || key == 'S' || key == 'D'
 	act := key == 'J' || key == 'K' || key == vkSpace
@@ -407,6 +484,7 @@ func (a *desktopHost) setControl(on bool) {
 		return
 	}
 	p.control, p.jumpEdge, p.attackEdge = on, false, false
+	p.skillEdges = [4]bool{}
 	a.haveKey = false
 	if on {
 		if a.chat != nil {
@@ -451,7 +529,7 @@ func (a *desktopHost) setControl(on bool) {
 
 // emote plays an expression on the pet's own initiative.
 func (a *desktopHost) emote(id string, hold time.Duration) bool {
-	if a.emotions == nil || a.play == nil {
+	if a.emotions == nil || a.play == nil || a.combatActive() {
 		return false
 	}
 	a.play.emotes++
@@ -460,6 +538,9 @@ func (a *desktopHost) emote(id string, hold time.Duration) bool {
 
 // say shows a line of the pet's own in the reply bubble.
 func (a *desktopHost) say(text string) {
+	if a.combatActive() {
+		return // Game announcements belong to the HUD, never a chat bubble.
+	}
 	if a.trip != nil && a.trip.external != nil {
 		return
 	}
@@ -514,6 +595,14 @@ func (a *desktopHost) stepPlay(now time.Duration) {
 	// While the user holds the pet or a filmed action plays, the controller
 	// waits and follows wherever the window goes.
 	held := a.drag || a.pointerDown || a.menuOpen || snap.State != animation.Idle
+	if p.fight != nil && p.fight.upgraded != nil {
+		a.stepCombatPlay(now, dt, a.drag || a.pointerDown || a.menuOpen)
+		a.stepGame(now, dt, a.focused())
+		if combatSmokeReport != "" {
+			a.stepCombatProbe(now)
+		}
+		return
+	}
 	p.ctl.Configure(play.Config{Unit: a.factor(), Free: a.standable})
 	if held || !p.ctl.Busy() {
 		if held && p.ctl.Busy() {
@@ -646,7 +735,11 @@ func (a *desktopHost) caught(count int, x, y float64, now time.Duration) {
 
 // spawn starts a burst or a rising number in a sprite window of its own.
 func (p *playState) spawn(e effect) {
-	if p.class == nil || len(p.effects) >= 6 {
+	limit := 6
+	if p.fight != nil {
+		limit = 12
+	}
+	if p.class == nil || len(p.effects) >= limit {
 		return
 	}
 	s, err := p.class.open()
@@ -740,6 +833,11 @@ func (a *desktopHost) stepGame(now time.Duration, dt float64, focused bool) {
 			life = .42
 		case e.ring:
 			life = .45
+		case e.kind != "":
+			life = .75
+		}
+		if e.kind == "dodge" || e.kind == "roll" {
+			life = .18
 		}
 		if age >= life {
 			e.sprite.close()
@@ -749,6 +847,14 @@ func (a *desktopHost) stepGame(now time.Duration, dt float64, focused bool) {
 		if e.text != "" {
 			pix, w, h := textSprite(e.text, max(2, int(math.Round(7*f))), true, math.Min(1, (1-t)*2.5))
 			_ = e.sprite.draw(int(e.x)-w/2, int(e.y-70*f*t)-h/2, w, h, pix)
+		} else if e.kind != "" {
+			var pixels []byte
+			if p.fight != nil && p.fight.upgraded != nil {
+				pixels = p.fight.upgraded.effectPixels(e.kind, e.size, t, p.settings.Game.Effects)
+			} else {
+				pixels = combatEffectSprite(e.kind, e.size, t, p.settings.Game.Effects)
+			}
+			_ = e.sprite.draw(int(e.x)-e.size/2, int(e.y)-e.size/2, e.size, e.size, pixels)
 		} else if e.ring {
 			_ = e.sprite.draw(int(e.x)-e.size/2, int(e.y)-e.size/2, e.size, e.size, ringSprite(e.size, t, [3]float64{1, .86, .45}))
 		} else {
@@ -777,6 +883,22 @@ func (a *desktopHost) stepGame(now time.Duration, dt float64, focused bool) {
 // stepHabits runs the things the pet does unprompted.
 func (a *desktopHost) stepHabits(now time.Duration) {
 	p := a.play
+	if combatServerAddress != "" {
+		p.settings.Game.Server = combatServerAddress
+		combatServerAddress = ""
+	}
+	if (combatLaunch || combatCreateRoom || combatJoinCode != "") && now > 3500*time.Millisecond {
+		if combatCreateRoom || combatJoinCode != "" {
+			a.beginOnline(combatJoinCode)
+		} else {
+			a.startFight()
+		}
+		combatLaunch, combatCreateRoom = false, false
+		combatJoinCode = ""
+	}
+	if combatSmokeReport != "" {
+		a.stepCombatProbe(now)
+	}
 	if !p.greeted && now > 1500*time.Millisecond {
 		p.greeted = true
 		a.emote("greet", 4*time.Second)
@@ -893,6 +1015,11 @@ func (a *desktopHost) playFrame(snap animation.Snapshot, body *image.NRGBA, clip
 	if p == nil {
 		return nil, nil
 	}
+	if p.fight != nil && p.fight.upgraded != nil {
+		if frame, ok, err := a.combatSkillFrame(); ok || err != nil {
+			return frame, err
+		}
+	}
 	now := a.now()
 	if p.carrying != nil {
 		frameIndex := snap.Frame
@@ -919,7 +1046,7 @@ func (a *desktopHost) playFrame(snap animation.Snapshot, body *image.NRGBA, clip
 				return nil, err
 			}
 			pose := rig.StrikePose(p.view.Strike, p.view.Power).Add(rig.Settle(p.stance, p.view.Settle))
-			body, err := p.stance.Render(p.texture("fight/12", frame), pose)
+			body, err := a.renderCombatRig(p.stance, p.texture("fight/12", frame), pose)
 			if err == nil && p.settings.Equipped != "" {
 				_, palm := rig.Arm(p.stance, pose)
 				holdWeapon(body, p.settings.Equipped, palm.X, palm.Y, gripAngle(p.view.Strike))
@@ -936,7 +1063,7 @@ func (a *desktopHost) playFrame(snap animation.Snapshot, body *image.NRGBA, clip
 		}
 		// The idle clip keeps playing under the rig, so the pet still breathes
 		// while it walks.
-		return p.stand.Render(p.texture(fmt.Sprint("idle/", snap.Frame), body), rig.StandPose(p.view.Gait))
+		return a.renderCombatRig(p.stand, p.texture(fmt.Sprint("idle/", snap.Frame), body), rig.StandPose(p.view.Gait))
 	}
 
 	// A held pose shows one clip; a scene runs through its entry, loop and
@@ -1033,31 +1160,42 @@ func (a *desktopHost) playMenu(menu, interact uintptr) {
 			}
 		}
 	}
-	games := sub(menu, "游戏（实验性玩法）")
+	games := sub(menu, "游戏")
 	if games == 0 {
 		return
 	}
-	label := "操控模式（方向键移动 · J 出掌 · K 跳）"
+	single := p.fight != nil && p.fight.upgraded.address == ""
+	label := "单机挑战"
+	if single {
+		label = "继续单机挑战"
+	}
+	item(games, menuFight, label, single)
+	a.combatMenu(games)
+	_, _ = call(appendMenu, games, 0x800, 0, 0)
+	a.weaponMenu(games)
+	// Desktop activities belong with interaction, apart from match actions.
+	desktop := sub(interact, "桌宠玩法")
+	if desktop == 0 {
+		return
+	}
+	label = "键盘操控"
 	if p.hotControl {
 		label += "\tCtrl+Alt+G"
 	}
-	item(games, menuControl, label, p.control)
+	item(desktop, menuControl, label, p.control)
 	label = "召唤到鼠标旁"
 	if p.hotSum {
 		label += "\tCtrl+Alt+H"
 	}
-	item(games, menuSummon, label, false)
-	item(games, menuShow, "表演一段", p.showing)
-	item(games, menuFight, "擂台挑战（打败对手掉落武器）", p.fight != nil)
-	a.weaponMenu(games)
-	if extras := sub(games, "玩法与实用"); extras != 0 {
-		item(extras, menuFlies, "操控时出现苍蝇", p.settings.Flies)
-		item(extras, menuStroll, "没事时自己散步", p.settings.Stroll)
-		if left := time.Until(p.focusEnd); !p.focusEnd.IsZero() && left > 0 {
-			item(extras, menuFocus, fmt.Sprintf("结束专注（还剩 %d 分钟）", int(math.Ceil(left.Minutes()))), true)
-		} else {
-			item(extras, menuFocus, "专注 25 分钟", false)
-		}
+	item(desktop, menuSummon, label, false)
+	item(desktop, menuShow, "表演一段", p.showing)
+	_, _ = call(appendMenu, desktop, 0x800, 0, 0)
+	item(desktop, menuFlies, "操控时出现苍蝇", p.settings.Flies)
+	item(desktop, menuStroll, "自动散步", p.settings.Stroll)
+	if left := time.Until(p.focusEnd); !p.focusEnd.IsZero() && left > 0 {
+		item(desktop, menuFocus, fmt.Sprintf("结束专注（还剩 %d 分钟）", int(math.Ceil(left.Minutes()))), true)
+	} else {
+		item(desktop, menuFocus, "专注 25 分钟", false)
 	}
 }
 

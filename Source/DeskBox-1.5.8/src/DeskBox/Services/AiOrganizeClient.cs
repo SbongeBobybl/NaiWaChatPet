@@ -26,7 +26,7 @@ public sealed partial class AiOrganizeClient : IAiOrganizeClient
     private const int MaxMessage = 64 * 1024;
     private readonly string _descriptorPath;
     public AiOrganizeClient(string? descriptorPath = null) => _descriptorPath = descriptorPath ?? Path.Combine(
-        Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData),        "NaiWaChatPet","versions","2.0.1","deskbox-agent","agent.json");
+        Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData),        "NaiWaChatPet","versions","2.1.0","deskbox-agent","agent.json");
 
     public Task<AiAgentResponse> HealthAsync(CancellationToken cancellationToken) =>
         SendAsync("health",false,null,null,null,cancellationToken);

@@ -65,6 +65,10 @@ func (s *Server) restoreV13Preferences(p Preferences) {
 }
 func (s *Server) schedulerStatusLocked(now time.Time) SchedulerStatus {
 	r := SchedulerStatus{Running: s.settings.Proactive || s.settings.IdleActions, Reason: s.scheduler.Reason, Queued: len(s.localQueue)}
+	if s.desktopGameActive {
+		r.Running = false
+		r.Reason = "格斗期间暂停主动陪伴，退出游戏后恢复"
+	}
 	if !s.scheduler.Last().IsZero() {
 		r.Last = s.scheduler.Last().Format(time.RFC3339)
 		r.Next = s.scheduler.Next(s.schedulerConfigLocked()).Format(time.RFC3339)

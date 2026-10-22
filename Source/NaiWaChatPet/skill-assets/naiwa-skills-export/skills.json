@@ -1,0 +1,44 @@
+{
+  "skills": [
+    {
+      "id": "skill_fan_throw",
+      "zh": "掷扇",
+      "clip": "animations/skill_fan_throw",
+      "fps": 12,
+      "frame_count": 14,
+      "note": "Wind-up with the fan flicking open, a whip-fast straight thrust, then the fan spins away on a horizontal line and bursts far past the left edge (flash, fireball, shock ring, sparks, paper shreds, smoke). No enemy is drawn. The clip ends on the reference plate.",
+      "skeletal": {
+        "skeleton": "skeletal/naiwa.json",
+        "atlas": "skeletal/naiwa.atlas",
+        "animation": "skill_fan_throw"
+      }
+    },
+    {
+      "id": "skill_roll",
+      "zh": "翻滚",
+      "clip": "animations/skill_roll",
+      "fps": 12,
+      "frame_count": 13,
+      "note": "Crouch, tuck, one full forward somersault screen-left (about 110 px of root travel), land in a tuck and rise. Rotation follows the travel and the ball keeps ground contact. Frame clips cannot carry root motion, so the last frame is the reference plate.",
+      "skeletal": {
+        "skeleton": "skeletal/naiwa.json",
+        "atlas": "skeletal/naiwa.atlas",
+        "animation": "skill_roll"
+      }
+    },
+    {
+      "id": "skill_power_up",
+      "zh": "蓄力",
+      "clip": "animations/skill_power_up",
+      "fps": 12,
+      "frame_count": 13,
+      "note": "Layered flame tongues, big back flames, peeling licks, rising embers, a pulsing glow and a ground pool, all behind the reference plate. The burn cycle loops. Opaque character pixels are not repainted.",
+      "skeletal": {
+        "skeleton": "skeletal/naiwa.json",
+        "atlas": "skeletal/naiwa.atlas",
+        "animation": "skill_power_up",
+        "loop_animation": "skill_power_up_loop"
+      }
+    }
+  ]
+}

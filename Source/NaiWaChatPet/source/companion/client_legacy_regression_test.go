@@ -25,13 +25,13 @@ func useAuditResponse(t *testing.T, body string, inspect func(*http.Request)) {
 }
 func TestClientRejectsEmptyContent(t *testing.T) {
 	useAuditResponse(t, `{"choices":[{"finish_reason":"stop","message":{"content":""}}]}`, nil)
-	if _, err := callDeepSeek(context.Background(), "sk-test-not-a-real-key", "deepseek-flash", []Message{{Role: "user", Content: "hello"}}, 1024); err == nil {
+	if _, err := callDeepSeek(context.Background(), "test-credential-not-a-real-key", "deepseek-flash", []Message{{Role: "user", Content: "hello"}}, 1024); err == nil {
 		t.Fatal("empty final output was accepted as a successful assistant reply")
 	}
 }
 func TestClientRejectsTruncatedResponse(t *testing.T) {
 	useAuditResponse(t, `{"choices":[{"finish_reason":"length","message":{"content":"half a sentence"}}]}`, nil)
-	if _, err := callDeepSeek(context.Background(), "sk-test-not-a-real-key", "deepseek-flash", []Message{{Role: "user", Content: "hello"}}, 1024); err == nil {
+	if _, err := callDeepSeek(context.Background(), "test-credential-not-a-real-key", "deepseek-flash", []Message{{Role: "user", Content: "hello"}}, 1024); err == nil {
 		t.Fatal("length-truncated response was accepted as complete")
 	}
 }
@@ -49,7 +49,7 @@ func TestClientExplicitDefaultThinkingDisabled(t *testing.T) {
 			t.Errorf("non-thinking mode not explicit: %q", p.Thinking.Type)
 		}
 	})
-	if _, err := callDeepSeek(context.Background(), "sk-test-not-a-real-key", "deepseek-flash", []Message{{Role: "user", Content: "hello"}}, 1024); err != nil {
+	if _, err := callDeepSeek(context.Background(), "test-credential-not-a-real-key", "deepseek-flash", []Message{{Role: "user", Content: "hello"}}, 1024); err != nil {
 		t.Fatal(err)
 	}
 }

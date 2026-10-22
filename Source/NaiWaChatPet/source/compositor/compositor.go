@@ -174,6 +174,23 @@ func Resize(src image.Image, width, height int) (*image.RGBA, error) {
 		return nil, errors.New("empty source")
 	}
 	out := image.NewRGBA(image.Rect(0, 0, width, height))
+	// Display-sized combat frames need no reconstruction filter. Preserve the
+	// independent output buffer and premultiplied-alpha contract on this path.
+	if rgba, ok := src.(*image.RGBA); ok && b.Dx() == width && b.Dy() == height {
+		for y := 0; y < height; y++ {
+			offset := rgba.PixOffset(b.Min.X, b.Min.Y+y)
+			copy(out.Pix[y*out.Stride:y*out.Stride+width*4], rgba.Pix[offset:offset+width*4])
+		}
+		for i := 0; i < len(out.Pix); i += 4 {
+			a := out.Pix[i+3]
+			for k := 0; k < 3; k++ {
+				if out.Pix[i+k] > a {
+					out.Pix[i+k] = a
+				}
+			}
+		}
+		return out, nil
+	}
 	clamp := func(v, lo, hi int) int {
 		if v < lo {
 			return lo

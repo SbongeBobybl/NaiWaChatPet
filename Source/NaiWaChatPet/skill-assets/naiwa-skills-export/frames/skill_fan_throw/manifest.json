@@ -1,0 +1,160 @@
+{
+  "name": "skill_fan_throw",
+  "emotion": "",
+  "skill": "skill_fan_throw",
+  "kind": "skill",
+  "fps": 12,
+  "frameCount": 14,
+  "loop": false,
+  "priority": 40,
+  "mouthAnchor": {
+    "frame": 0,
+    "x": 153.5,
+    "y": 138.0
+  },
+  "mouthKeyframes": [
+    {
+      "frame": 0,
+      "x": 153.5,
+      "y": 138.0
+    },
+    {
+      "frame": 1,
+      "x": 167.38,
+      "y": 139.19
+    },
+    {
+      "frame": 2,
+      "x": 179.02,
+      "y": 142.42
+    },
+    {
+      "frame": 3,
+      "x": 148.85,
+      "y": 133.06
+    },
+    {
+      "frame": 4,
+      "x": 109.17,
+      "y": 148.02
+    },
+    {
+      "frame": 5,
+      "x": 112.19,
+      "y": 147.89
+    },
+    {
+      "frame": 6,
+      "x": 116.96,
+      "y": 146.41
+    },
+    {
+      "frame": 7,
+      "x": 120.93,
+      "y": 145.17
+    },
+    {
+      "frame": 8,
+      "x": 137.56,
+      "y": 140.57
+    },
+    {
+      "frame": 9,
+      "x": 131.48,
+      "y": 141.62
+    },
+    {
+      "frame": 10,
+      "x": 143.12,
+      "y": 142.6
+    },
+    {
+      "frame": 11,
+      "x": 158.73,
+      "y": 140.6
+    },
+    {
+      "frame": 12,
+      "x": 152.74,
+      "y": 137.72
+    },
+    {
+      "frame": 13,
+      "x": 153.5,
+      "y": 138.0
+    }
+  ],
+  "transitionIn": "",
+  "transitionOut": "",
+  "canvas": {
+    "width": 420,
+    "height": 560
+  },
+  "groundY": 540,
+  "frames": [
+    {
+      "file": "0000.png",
+      "sha256": "cc055177b4847597a08443d299de01ef9973aa4758d012f8433733324bd0e3e2"
+    },
+    {
+      "file": "0001.png",
+      "sha256": "50d1f5396de17ebb95006e320278c0267d7ac0588db8bc7b24f74b7535804075"
+    },
+    {
+      "file": "0002.png",
+      "sha256": "4f3592e904c72796b0a9768a07f6c950eb90f93c0f463a1b1ae7aca98105cd6d"
+    },
+    {
+      "file": "0003.png",
+      "sha256": "1f1255c0e2c69efb23e9ba1d9c21eed7f10b6c02aedf2b28ba254953a8f03b85"
+    },
+    {
+      "file": "0004.png",
+      "sha256": "e73278dd876aba8d7219882d2ed2366735001bc5131079fb89bde347e9f711b8"
+    },
+    {
+      "file": "0005.png",
+      "sha256": "0ca9dd0f6af765ec4aa960ed205b0f70c6ce2b11b016b8011d61132fb5c73d47"
+    },
+    {
+      "file": "0006.png",
+      "sha256": "5cdc55f2d50984f2531d3adb5c4e2bb509774c78112473894efc31779d606469"
+    },
+    {
+      "file": "0007.png",
+      "sha256": "102132ab6ea3be82cfd9f3b6bf431973054bf61520537966e4e688892745147c"
+    },
+    {
+      "file": "0008.png",
+      "sha256": "4b2eaaeab094070ee66e260946e2d4efb00a5111f29a740b81cdb6c0c9ce1de5"
+    },
+    {
+      "file": "0009.png",
+      "sha256": "c2614d4d9abf2712b300f2c382979ef975304a7bd5b6e97539fa42cf850b7897"
+    },
+    {
+      "file": "0010.png",
+      "sha256": "5dd40b2afea224225dcdda54ffeaa2f1f3749889ffe4cdbe3192d6ede7f3f69a"
+    },
+    {
+      "file": "0011.png",
+      "sha256": "ff8547129ce29181f738ed6f523bf3eeefa04c52300782a434db6e7877deefdc"
+    },
+    {
+      "file": "0012.png",
+      "sha256": "4a8022dae5197e652cda86c767c96fd102eb10c92d4c5de42d6dcba918924379"
+    },
+    {
+      "file": "0013.png",
+      "sha256": "cc055177b4847597a08443d299de01ef9973aa4758d012f8433733324bd0e3e2"
+    }
+  ],
+  "reviewed": true,
+  "sourceSha256": "08a8aa44b68744f54f7f90e062e41fc83231dd653fe028e6cfef0680f1f7c2e2",
+  "skeletal": {
+    "skeleton": "skeletal/naiwa.json",
+    "atlas": "skeletal/naiwa.atlas",
+    "animation": "skill_fan_throw"
+  },
+  "issues": []
+}

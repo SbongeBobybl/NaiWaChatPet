@@ -6,7 +6,7 @@ import (
 )
 
 const ProductName = "NaiWaChatPet"
-const ReleaseProfile = "2.0.1"
+const ReleaseProfile = "2.1.0"
 
 // Every release starts from its own factory profile. Same-version restarts
 // preserve locally encrypted credentials and memory. Never import old profiles.

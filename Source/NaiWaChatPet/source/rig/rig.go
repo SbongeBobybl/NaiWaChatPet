@@ -89,13 +89,14 @@ type LayerSpec struct {
 
 // Puppet is an immutable rig; Render may be called from one goroutine at a time.
 type Puppet struct {
-	w, h   int
-	bones  []Bone
-	layers []Layer
-	world  []Affine
-	moved  []Vec
-	sheet  []uint8
-	out    []uint8
+	drawW, drawH int
+	w, h         int
+	bones        []Bone
+	layers       []Layer
+	world        []Affine
+	moved        []Vec
+	sheet        []uint8
+	out          []uint8
 }
 
 const cell = 10
@@ -297,8 +298,22 @@ func NewTexture(frame *image.NRGBA) *Texture {
 // Render draws the posed frame as straight-alpha pixels with zero RGB wherever
 // alpha is zero, matching the release contract for body frames.
 func (p *Puppet) Render(tex *Texture, pose Pose) (*image.NRGBA, error) {
+	return p.RenderSized(tex, pose, p.w, p.h)
+}
+
+// RenderSized rasterizes the original mesh directly at display resolution.
+// Texture coordinates and bone transforms stay in authored canvas units.
+func (p *Puppet) RenderSized(tex *Texture, pose Pose, width, height int) (*image.NRGBA, error) {
+	if width < 1 || height < 1 || width > 4096 || height > 4096 {
+		return nil, errors.New("rig: invalid render dimensions")
+	}
 	if tex == nil || tex.w != p.w || tex.h != p.h {
 		return nil, errors.New("rig: texture does not match the puppet canvas")
+	}
+	p.drawW, p.drawH = width, height
+	if len(p.out) != width*height*4 {
+		p.out = make([]uint8, width*height*4)
+		p.sheet = make([]uint8, width*height*4)
 	}
 	p.solve(pose)
 	clear(p.out)
@@ -314,7 +329,7 @@ func (p *Puppet) Render(tex *Texture, pose Pose) (*image.NRGBA, error) {
 				x += q.X * float64(v.w[k])
 				y += q.Y * float64(v.w[k])
 			}
-			p.moved[i] = Vec{x, y}
+			p.moved[i] = Vec{x * float64(width) / float64(p.w), y * float64(height) / float64(p.h)}
 		}
 		dirty := image.Rectangle{}
 		for i, t := range layer.tris {
@@ -326,7 +341,7 @@ func (p *Puppet) Render(tex *Texture, pose Pose) (*image.NRGBA, error) {
 		}
 		p.flatten(dirty)
 	}
-	out := image.NewNRGBA(image.Rect(0, 0, p.w, p.h))
+	out := image.NewNRGBA(image.Rect(0, 0, width, height))
 	for i := 0; i < len(p.out); i += 4 {
 		a := uint32(p.out[i+3])
 		switch a {
@@ -353,8 +368,8 @@ func (p *Puppet) fill(tex *Texture, mask []uint8, a, b, c, ua, ub, uc Vec) image
 	}
 	x0 := max(0, int(math.Floor(math.Min(a.X, math.Min(b.X, c.X)))))
 	y0 := max(0, int(math.Floor(math.Min(a.Y, math.Min(b.Y, c.Y)))))
-	x1 := min(p.w-1, int(math.Ceil(math.Max(a.X, math.Max(b.X, c.X)))))
-	y1 := min(p.h-1, int(math.Ceil(math.Max(a.Y, math.Max(b.Y, c.Y)))))
+	x1 := min(p.drawW-1, int(math.Ceil(math.Max(a.X, math.Max(b.X, c.X)))))
+	y1 := min(p.drawH-1, int(math.Ceil(math.Max(a.Y, math.Max(b.Y, c.Y)))))
 	if x0 > x1 || y0 > y1 {
 		return image.Rectangle{}
 	}
@@ -374,7 +389,7 @@ func (p *Puppet) fill(tex *Texture, mask []uint8, a, b, c, ua, ub, uc Vec) image
 		// The nudge keeps a rest-pose sample on its own texel despite rounding.
 		u := (w0*ua.X+w1*ub.X+(1-w0-w1)*uc.X)*256 - 128 + 1e-4
 		v := (w0*ua.Y+w1*ub.Y+(1-w0-w1)*uc.Y)*256 - 128 + 1e-4
-		o := (y*w + x0) * 4
+		o := (y*p.drawW + x0) * 4
 		for x := x0; x <= x1; x, w0, w1, u, v, o = x+1, w0+w0x, w1+w1x, u+ux, v+vx, o+4 {
 			if w0 < slack || w1 < slack || 1-w0-w1 < slack {
 				continue
@@ -450,7 +465,7 @@ func (p *Puppet) border(tex *Texture, mask []uint8, x, y int, ax, ay uint32, o i
 func (p *Puppet) flatten(r image.Rectangle) {
 	for y := r.Min.Y; y < r.Max.Y; y++ {
 		for x := r.Min.X; x < r.Max.X; x++ {
-			o := (y*p.w + x) * 4
+			o := (y*p.drawW + x) * 4
 			a := uint32(p.sheet[o+3])
 			if a == 0 {
 				continue

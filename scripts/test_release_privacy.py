@@ -9,7 +9,8 @@ class ReleasePrivacyTests(unittest.TestCase):
         check_bytes('app.exe', b'locale-lk-sk-' + b'locale'*50)
     def test_weapon_memory_and_backup_state_rejected(self):
         for name in ['play.json', 'play.json.bak', 'settings.json.tmp', 'logs/requests.jsonl',
-                     'companion-memory.dpapi.old', 'companion-preferences.json.backup']:
+                     'companion-memory.dpapi.old', 'companion-preferences.json.backup',
+                     'ReceivedFiles/image.png', 'demo_logs/data.txt']:
             with self.subTest(name=name), self.assertRaises(RuntimeError):
                 check_bytes(name, b'{}')
     def test_utf16_key_rejected(self):

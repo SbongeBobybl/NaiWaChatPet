@@ -86,6 +86,7 @@ type Server struct {
 	lastProactive                        time.Time
 	lastScreen                           time.Time
 	lastInteraction                      time.Time
+	desktopGameActive                    bool
 	running                              bool
 	screenCapture                        CaptureFunc
 	server                               *http.Server

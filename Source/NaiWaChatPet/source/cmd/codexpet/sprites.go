@@ -2,19 +2,45 @@ package main
 
 import (
 	"math"
+	"math/bits"
 	"strconv"
+	"sync"
 )
 
 // painter draws the small procedural sprites of control mode: the ground
 // shadow, flies, impact bursts and score digits. It accumulates premultiplied
 // colour so the result can go straight to a layered window.
 type painter struct {
-	w, h int
-	pix  []float64
+	poolBucket int
+	w, h       int
+	pix        []float64
 }
 
 func newPainter(w, h int) *painter {
-	return &painter{w: max(1, w), h: max(1, h), pix: make([]float64, max(1, w)*max(1, h)*4)}
+	w, h = max(1, w), max(1, h)
+	n := w * h * 4
+	bucket := bits.Len(uint(n - 1))
+	var pix []float64
+	if bucket < len(painterPools) {
+		if cached := painterPools[bucket].Get(); cached != nil {
+			pix = cached.([]float64)
+		}
+	}
+	if pix == nil {
+		pix = make([]float64, 1<<bucket)
+	}
+	pix = pix[:n]
+	clear(pix)
+	return &painter{w: w, h: h, pix: pix, poolBucket: bucket}
+}
+
+var painterPools [32]sync.Pool
+
+func (p *painter) recycle() {
+	if p.pix != nil && p.poolBucket < len(painterPools) {
+		painterPools[p.poolBucket].Put(p.pix[:cap(p.pix)])
+	}
+	p.pix = nil
 }
 
 // over lays one colour over a pixel with the given coverage.
@@ -50,14 +76,40 @@ func ellipse(cx, cy, rx, ry, angle, soft float64) func(x, y float64) float64 {
 
 // bgra returns the picture as premultiplied BGRA rows, top first.
 func (p *painter) bgra() []byte {
+	defer p.recycle()
 	out := make([]byte, len(p.pix))
 	for i := 0; i < len(p.pix); i += 4 {
-		a := math.Min(1, p.pix[i+3])
+		a := p.pix[i+3]
+		if a <= 0 {
+			continue
+		}
+		if a > 1 {
+			a = 1
+		}
 		// Colour may never exceed alpha in a layered window.
-		out[i] = byte(math.Round(255 * math.Min(a, p.pix[i+2])))
-		out[i+1] = byte(math.Round(255 * math.Min(a, p.pix[i+1])))
-		out[i+2] = byte(math.Round(255 * math.Min(a, p.pix[i])))
-		out[i+3] = byte(math.Round(255 * a))
+		b, g, r := p.pix[i+2], p.pix[i+1], p.pix[i]
+		if b > a {
+			b = a
+		}
+		if g > a {
+			g = a
+		}
+		if r > a {
+			r = a
+		}
+		if b < 0 {
+			b = 0
+		}
+		if g < 0 {
+			g = 0
+		}
+		if r < 0 {
+			r = 0
+		}
+		out[i] = byte(b*255 + .5)
+		out[i+1] = byte(g*255 + .5)
+		out[i+2] = byte(r*255 + .5)
+		out[i+3] = byte(a*255 + .5)
 	}
 	return out
 }

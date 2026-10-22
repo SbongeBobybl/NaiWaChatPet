@@ -1,9 +1,9 @@
-﻿#define MyAppName "NaiWaChatPet"
+#define MyAppName "NaiWaChatPet"
 [Setup]
 AppId={{D21E3D70-BC1D-4AFE-A890-6C147AF78026}
 AppName=奶蛙桌宠
-AppVersion=2.0.1
-AppVerName=奶蛙桌宠 V2.0.1
+AppVersion=2.1.0
+AppVerName=奶蛙桌宠 V2.1.0
 AppPublisher=NaiWaChatPet
 DefaultDirName={localappdata}\Programs\NaiWaChatPet
 DefaultGroupName=奶蛙桌宠
@@ -12,7 +12,7 @@ ArchitecturesAllowed=x64compatible
 ArchitecturesInstallIn64BitMode=x64compatible
 MinVersion=10.0.19041
 OutputDir=..\Release
-OutputBaseFilename=NaiWaChatPet-Setup-v2.0.1-x64
+OutputBaseFilename=NaiWaChatPet-Setup-v2.1.0-x64
 SetupIconFile=..\Source\NaiWaChatPet\icons\NaiWaChatPet.ico
 UninstallDisplayIcon={app}\NaiWaChatPet.exe
 Compression=lzma2
@@ -21,11 +21,11 @@ WizardStyle=modern
 DisableProgramGroupPage=yes
 LicenseFile=..\Source\DeskBox-1.5.8\LICENSE
 CloseApplications=yes
-CloseApplicationsFilter=NaiWaChatPet.exe,DeskBox.exe
+CloseApplicationsFilter=NaiWaChatPet.exe,DeskBox.exe,NaiWaFightServer.exe
 [Tasks]
 Name: "desktopicon"; Description: "创建奶蛙桌面快捷方式"; Flags: unchecked
 [Files]
-Source: "..\Release\NaiWaChatPet-v2.0.1\*"; DestDir: "{app}"; Flags: ignoreversion recursesubdirs createallsubdirs
+Source: "..\Release\NaiWaChatPet-v2.1.0\*"; DestDir: "{app}"; Flags: ignoreversion recursesubdirs createallsubdirs
 [Icons]
 Name: "{group}\奶蛙桌宠"; Filename: "{app}\NaiWaChatPet.exe"; WorkingDir: "{app}"
 Name: "{autodesktop}\奶蛙桌宠"; Filename: "{app}\NaiWaChatPet.exe"; WorkingDir: "{app}"; Tasks: desktopicon

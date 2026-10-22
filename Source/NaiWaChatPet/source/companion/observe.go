@@ -270,6 +270,9 @@ func (s *Server) EmotionCue() (id, stage, user, reply string) {
 	return s.view.RequestID, s.view.Stage, s.lastText, s.view.Text
 }
 func (s *Server) publishLocalLocked(text, action string) {
+	if s.desktopGameActive {
+		return
+	}
 	if action != "" {
 		s.localAction = action
 		s.localSequence++
@@ -287,6 +290,11 @@ func (s *Server) publishLocalLocked(text, action string) {
 func (s *Server) periodic(now time.Time) {
 	s.mu.Lock()
 	s.expireLocked(now)
+	if s.desktopGameActive {
+		s.scheduler.Reason = "格斗期间暂停主动陪伴，退出游戏后恢复"
+		s.mu.Unlock()
+		return
+	}
 	if s.busy || s.activeCaptureCancel != nil || s.desktopInputVisible || s.desktopReplyVisible && s.settings.ProactiveSeconds > 0 {
 		s.scheduler.Reason = "正在回复或截图，提醒稍后显示"
 		s.mu.Unlock()

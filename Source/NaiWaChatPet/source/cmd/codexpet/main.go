@@ -11,6 +11,8 @@ import (
 	"time"
 
 	"codexpet/reconstruction/companion"
+	"codexpet/reconstruction/play"
+	"codexpet/reconstruction/rig"
 )
 
 // The final bundle can provide this variable in a separate embed adapter.
@@ -21,6 +23,17 @@ var showStartupDialog = true
 var companionService *companion.Server
 
 var animationDirectory string
+
+var combatSmokeReport string
+var combatSmokeSeconds float64
+var combatOnlineSmoke bool
+var combatLobbySmoke bool
+var combatLaunch, combatCreateRoom bool
+var combatServerAddress, combatJoinCode string
+
+var combatRulesPath string
+
+var combatSkillAssets string
 
 var startMode string
 
@@ -123,14 +136,44 @@ func entry() error {
 	flag.StringVar(&animationDirectory, "animations", "", "optional reviewed emotion animation directory")
 	demo := flag.Bool("demo", startMode == "demo", "offline native chat demonstration; no model network traffic")
 	check := flag.Bool("check", false, "validate assets/configuration without creating a window")
+	gameVersion := flag.Bool("game-version", false, "print the combat build identifier")
 	renderCheck := flag.Bool("render-check", false, "validate a sample of every animation through premultiplied BGRA compositor")
 	flag.BoolVar(&showOnLaunch, "play-demo", false, "perform the movement routine shortly after start-up")
 	flag.StringVar(&tidyTarget, "desktop", "", "tidy this folder instead of the desktop, for trying the organizer on a copy")
 	flag.BoolVar(&tidyOnLaunch, "tidy-demo", false, "start a tidy shortly after start-up")
 	flag.BoolVar(&fightOnLaunch, "fight-demo", false, "start an arena bout the pet fights by itself")
+	flag.BoolVar(&combatLaunch, "fight", false, "start an interactive single-player challenge")
+	flag.BoolVar(&combatCreateRoom, "fight-create", false, "create an online fight room after startup")
+	flag.StringVar(&combatJoinCode, "fight-room", "", "join a six-character online room code")
+	flag.StringVar(&combatServerAddress, "fight-server", "", "override game server address")
+	flag.StringVar(&combatRulesPath, "combat-rules", "", "optional single-player combat JSON configuration; online rules are server authoritative")
+	flag.StringVar(&combatSkillAssets, "skill-assets", "", "optional original user skeletal directory with naiwa.json and images")
+	flag.StringVar(&combatSmokeReport, "combat-gui-smoke", "", "run isolated GUI performance/lifecycle probe and write JSON report")
+	flag.Float64Var(&combatSmokeSeconds, "combat-smoke-seconds", 30, "GUI probe duration across three game sessions")
+	flag.BoolVar(&combatOnlineSmoke, "combat-online-smoke", false, "use two real TCP clients in the isolated GUI probe")
+	flag.BoolVar(&combatLobbySmoke, "combat-lobby-smoke", false, "exercise native lobby pages in the isolated GUI probe")
 	noShortcut := flag.Bool("no-shortcut", false, "leave the desktop shortcut alone, for test runs of a build outside the release folder")
 	flag.Parse()
-	if !*check && !*renderCheck {
+	if *gameVersion {
+		fmt.Println(play.GameBuild)
+		return nil
+	}
+	if combatSkillAssets != "" {
+		library, err := rig.LoadSkillAnimations(os.DirFS(combatSkillAssets), "naiwa.json")
+		if err != nil {
+			return fmt.Errorf("skill assets: %w", err)
+		}
+		if err = rig.RegisterSkillAnimations(library); err != nil {
+			return err
+		}
+	}
+	if combatSmokeReport != "" {
+		fightOnLaunch = true
+		*demo = true
+		*noShortcut = true
+		combatSmokeSeconds = max(12, min(180, combatSmokeSeconds))
+	}
+	if !*check && !*renderCheck && combatSmokeReport == "" {
 		release, acquired, err := acquireDeskBoxPetInstance()
 		if err != nil {
 			return err

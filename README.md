@@ -1,39 +1,93 @@
 # 奶蛙桌宠 · NaiWaChatPet
 
-**V2.0.1（2.0.1） / v2.0.1 · Windows x64**
+**V2.1.0（2.1.0） / v2.1.0 · Windows x64**
 
-让奶蛙陪你聊天、玩耍，也帮你收拾桌面。桌面整理是奶蛙的一项功能：从奶蛙启动，在预览中决定分类和文件处理方式，再看它收集文件、跑到分类格子旁放下。
+让奶蛙陪你聊天、玩耍，也帮你收拾桌面。V2.1.0 在聊天、情绪和 AI 桌面整理之外，完成了格斗模式：蓝量与技能、三档电脑对手、局域网房间大厅，以及可选的独立房间服务端。
 
-[开始使用](#开始使用) · [整理方式](#整理方式) · [AI 分类](#ai-分类) · [外观与动画](#外观与动画) · [隐私](#隐私与发布数据) · [构建](#从源码构建) · [常见问题](#常见问题) · [更新记录](CHANGELOG.md) · [测试报告](docs/TEST-REPORT.md)
+[开始使用](#开始使用) · [格斗与局域网联机](#格斗与局域网联机) · [整理方式](#整理方式) · [AI 分类](#ai-分类) · [外观与动画](#外观与动画) · [隐私](#隐私与发布数据) · [构建](#从源码构建) · [常见问题](#常见问题) · [更新记录](CHANGELOG.md) · [格斗测试报告](docs/FIGHT-TEST-REPORT.md)
 
 ## 开始使用
 
-1. 从本仓库 **Releases** 下载 `NaiWaChatPet-Setup-v2.0.1-x64.exe`。源码 ZIP 不能直接运行。
+1. 从本仓库 **Releases** 下载 `NaiWaChatPet-Setup-v2.1.0-x64.exe`。源码 ZIP 不能直接运行。
 2. 运行安装程序，安装后启动 **奶蛙桌宠**。也可使用完整运行目录中的 `NaiWaChatPet.exe`。
 3. 右键奶蛙 → **整理桌面**，检查扫描结果、整理范围与存放位置。
 4. 选择离线分类或 AI 分类，修改分类名称、归属、排除项。
 5. 确认“原文件如何处理”，再执行。先出现分类格子，奶蛙随后搬运。
 
-> 始终启动 `NaiWaChatPet.exe`。`Organizer/DeskBox.exe` 是随奶蛙附带的整理引擎，不是日常使用入口。完整运行目录必须保留 `Organizer` 子目录。
+> 始终启动 `NaiWaChatPet.exe`。`Organizer/DeskBox.exe` 是随奶蛙附带的整理引擎，不是日常使用入口。完整运行目录必须保留 `Organizer`、`animations` 与 `skill-assets` 三个子目录，以及 `combat.json`；缺少 `animations` 时只有内置表情可用，缺少 `skill-assets` 时格斗技能没有骨骼表现。
 
-支持 Windows 10 2004（19041）及更新版本、Windows 11，当前发布 x64 安装包。安装包自带整理引擎所需运行库；AI 请求需要网络和模型服务配置。首次源码构建需要联网下载工具链和依赖。未提供数字签名，系统可能显示未知发布者。
+支持 Windows 10 2004（19041）及更新版本、Windows 11，当前发布 x64 安装包。安装包自带整理引擎与格斗资源所需运行库；AI 请求需要网络和模型服务配置；局域网联机需要双方在同一网络并允许奶蛙访问专用网络。首次源码构建需要联网下载工具链和依赖。未提供数字签名，系统可能显示未知发布者。
 
 <details>
 <summary><strong>升级、卸载与校验</strong>（点击展开）</summary>
 
 - 升级前退出旧版奶蛙，运行新版安装程序。不要同时运行多个版本。
 - 安装版默认位于 `%LOCALAPPDATA%\Programs\NaiWaChatPet`，开始菜单入口指向奶蛙。
-- V2.0.1 使用全新的独立配置目录，首次启动不读取旧版 API Key、记忆或游戏进度；需要重新填写自己的模型配置。旧版数据不会被删除。
+- V2.1.0 使用全新的独立配置目录 `%APPDATA%\NaiWaChatPet\versions\2.1.0`，首次启动不读取 V2.0.1 或 13.x 的 API Key、记忆、聊天与游戏存档；需要重新填写自己的模型配置。旧版数据不会被删除。
 - 卸载程序不是“撤销整理”。已移动的文件需先在整理界面撤销；不要直接删除存放目录。
+- 彻底清除 API Key 与聊天记忆请删除 `%APPDATA%\NaiWaChatPet\versions\2.1.0`，或在设置页点击“清除 Key 与本地聊天记忆”。
 - 下载后在 PowerShell 运行：
 
 ```powershell
-Get-FileHash .\NaiWaChatPet-Setup-v2.0.1-x64.exe -Algorithm SHA256
+Get-FileHash .\NaiWaChatPet-Setup-v2.1.0-x64.exe -Algorithm SHA256
 ```
 
 与同一 Release 的 `SHA256SUMS.txt` 比较。运行目录内的 `checksums.json` 用于逐文件核对。
 
 </details>
+
+## 格斗与局域网联机
+
+格斗模式从右键菜单 **游戏（实验性玩法）** 进入。V2.1.0 保留原有三连击、移动、跳跃、武器属性与掉落、连续挑战，并接入统一的战斗核心。
+
+### 基础规则
+
+- 标准对战双方 **80 生命**，每回合 **120 秒**；单机对手基础血量同步降低 20%。
+- 双方初始与最大 **蓝量 100**，每秒自然恢复 2.5；普攻、飞扇直接命中、翻滚有效命中各回 1 点。
+- 同一次攻击对同一目标不会重复回蓝；灼烧、闪避成功与自身强化不回蓝。
+- `combat.json` 提供战斗数值（`damageScale=1.25` 等）；旧配置缺少新增字段时自动补默认值。
+- 连续承受 6 次直接攻击后获得 0.5 秒保护并解除当前硬直；第 6 次仍正常扣血，灼烧不计入次数，1.1 秒未再被直接命中则重置。
+- HUD 显示生命、蓝量、技能可用与冷却、灼烧、眩晕、强化层数、连击保护及胜负结果。
+
+### 默认技能
+
+| 操作 | 按键 | 蓝量 | 冷却 | 效果 |
+| --- | --- | --- | --- | --- |
+| 普通攻击 | J | 0 | 由动作与连招窗口控制 | 保留三连击，基础每击 1 点伤害，第三段击退更强 |
+| 爆裂飞扇 | U | 10 | 1.5 秒 | 直接伤害 5，附加 5 秒灼烧（每秒 0.2，共 5 次） |
+| 冲撞翻滚 | I | 20 | 2.5 秒 | 向面朝方向实际移动，命中造成 7 伤害并眩晕 0.5 秒 |
+| 战斗强化 | O | 30 | 3.5 秒 | 恢复最大生命 5%（标准血量 4 点），每层提高 1% 直接伤害 |
+| 闪避 | L | 0 | 无冷却 | 单次约 0.30 秒，无敌约 0.18 秒，可连续衔接 |
+
+飞扇从动画手部锚点发射，按朝向飞行，使用实际碰撞与扫掠检测；翻滚仅限地面，受场地边界与对手阻挡限制。
+
+### 电脑对手
+
+简单、普通、困难三档，通过反应间隔、决策质量和技能策略区分。电脑会控制距离、衔接普攻、按距离投扇或翻滚、在安全机会治疗强化、观察起手与部分弹体轨迹进行闪避，并在低血低蓝时撤退。AI 与玩家共用技能、蓝量、伤害、冷却与眩晕规则；困难模式没有无限蓝、隐藏伤害或读取未来输入的能力。
+
+### 局域网房间
+
+1. 双方使用同一新版客户端，连接同一局域网。
+2. 房主：右键奶蛙 → 游戏 → 联机大厅 → 创建房间。
+3. 好友：打开联机大厅，附近房间列表会自动发现；选择并点加入，或输入 6 位房间码。
+4. 双方准备，倒计时后进入战斗。
+5. 对局结束查看胜利／失败／平局，可再来一局或离开。
+
+创建房间会自动启动进程内房间服务，普通局域网对战不需要另外打开服务端或 CMD，也不要求查询 IPv4。房主离开游戏或退出奶蛙，房间随之关闭。首次出现 Windows 网络访问提示时，请允许奶蛙访问专用网络。
+
+房间发现支持逐网卡广播，并在广播无响应时使用有界 TCP 备用发现，改善热点、VPN、多网卡环境。设备隔离、防火墙或热点限制仍可能阻止连接。
+
+### 独立房间服务端
+
+`NaiWaFightServer.exe` 是可选的 Windows 独立服务器；源码另可构建 Linux 版 `naiwa-fight-server-linux-amd64`。部署、服务地址与 TLS 说明见 [docs/FIGHT-NETWORK.md](docs/FIGHT-NETWORK.md)。普通局域网对战无需运行它。
+
+**提供可部署服务端不代表已经部署公网服务。** 当前没有可承诺持续可用的官方公网房间服务，公网真人实测仍需另验。
+
+### 已知限制
+
+- L 闪避的位移、无敌、零冷却与反馈已实现，**正式闪避骨骼尚未接入**；现有表现不是最终动作。
+- 联机双方必须使用同一版本；旧房主或旧服务器仍会提供旧规则，更新后请重新创建房间。
+- 未完成不同热点、硬件与网络组合的系统验收；长时间对战仍需真实玩家复测。
 
 ## 整理方式
 
@@ -71,21 +125,19 @@ AI 沿用奶蛙已有模型服务设置与 API Key，无需为整理引擎重复
 4. 检查预览，拖拽调整归属，勾选或排除项目，选择处理方式与动画档位。
 5. 点击底部确认按钮执行。分类请求本身不会移动源文件。
 
-默认支持离线规则。结果区会标明本次是“AI 语义分类”还是“本地规则分类（未使用 AI）”；未配置模型或奶蛙未连接时不会发起 AI 请求。遇到服务失败、超时或返回无效类别，先查看提示、模型连接与名称发送授权。文件内容、完整路径、聊天记忆和 API Key 不作为分类条目发送；API Key 只用于所选模型服务的鉴权。
-
-
+结果区会标明本次是“AI 语义分类”还是“本地规则分类（未使用 AI）”；未配置模型或奶蛙未连接时不会发起 AI 请求。文件内容、完整路径、聊天记忆和 API Key 不作为分类条目发送；API Key 只用于所选模型服务的鉴权。
 
 ## 外观与动画
 
-奶蛙主界面保留聊天、情绪、游戏及桌面交互。整理工作台使用浅色偏黄风格；分类格子的菜单可选择浅色/深色、透明/不透明。透明模式让内容区融入桌面，标题栏保留操作入口。文件格子保留拖拽、圆角、布局、叠放和胶囊等基础能力。
+奶蛙主界面保留聊天、情绪、游戏及桌面交互。整理工作台使用浅色偏黄风格；分类格子的菜单可选择浅色/深色、透明/不透明。透明模式让内容区融入桌面，标题栏保留操作入口。文件格子保留拖拽、圆角、布局、叠放和胶囊等基础能力。格斗大厅采用浅色原生界面，含顶部导航、附近房间列表与双方席位；HUD 在生命条下显示蓝条、技能与状态。
 
-| 动画选项 | 行为 |
+| 整理动画 | 行为 |
 | --- | --- |
 | 完整动画 | 按类别收集、携带、走到目标格子、放下 |
 | 简易动画 | 整次整理展示一趟代表性搬运 |
 | 无动画 | 直接执行整理，不等待奶蛙表演 |
 
-V2.0.1 修复了引用模式被额外 10 秒限制截断的问题；动画使用实际分类格子位置，并保留统一通信超时、阶段看门狗和用户取消机制。快捷方式简易动画也会正确结束等待。
+情绪动作沿用原有资源：27 种自动表情与 7 种自用动作，共 34 种。格斗技能 U／I／O 使用用户提供的骨骼资源，支持动画事件、手部发射点与根位移；原始骨骼、关键帧与贴图未改写。
 
 ## 隐私与发布数据
 
@@ -100,18 +152,18 @@ V2.0.1 修复了引用模式被额外 10 秒限制截断的问题；动画使用
 | IPC 描述文件、日志、请求记录、恢复记录 | 否 |
 | 内置动画、角色图片、武器定义和游戏代码 | 是，属于功能资源，不是个人存档 |
 
-V2.0.1 的奶蛙配置位于 `%APPDATA%\NaiWaChatPet\versions\2.0.1`，不自动导入旧版 `13.4.0` 的配置、记忆、聊天或武器存档。旧数据保留在原目录。整理引擎继续保留本机文件整理历史，以便撤销先前移动；这些历史不进入发布包。不要把 AppData、日志或存档提交到仓库。
+V2.1.0 的奶蛙配置位于 `%APPDATA%\NaiWaChatPet\versions\2.1.0`，不自动导入 V2.0.1 或 13.4.0 的配置、记忆、聊天或武器存档。旧数据保留在原目录。整理引擎继续保留本机文件整理历史，以便撤销先前移动；这些历史不进入发布包。游戏协议不传输聊天记录、桌面截图、文件或模型 Key。不要把 AppData、日志或存档提交到仓库。
 
 <details>
 <summary><strong>发布前自检命令</strong></summary>
 
 ```powershell
 python scripts/test_release_privacy.py
-python scripts/release_privacy.py Release/NaiWaChatPet-v2.0.1
-python scripts/release_privacy.py Release/NaiWaChatPet-Source-v2.0.1.zip
+python scripts/release_privacy.py Release/NaiWaChatPet-v2.1.0
+python scripts/release_privacy.py Release/NaiWaChatPet-Source-v2.1.0.zip
 ```
 
-检查失败时只会报告文件名，不会打印密钥值。扫描会拒绝运行存档、常见密钥形式、非空 JSON 密钥字段、重复 ZIP 条目和越界路径。自动扫描不能识别所有可能形式的秘密，提交自定义文件前仍应检查其内容。
+检查失败时只会报告文件名，不会打印密钥值。扫描会拒绝运行存档、常见密钥形式、DPAPI 数据块、非空 JSON 密钥字段、重复 ZIP 条目和越界路径。自动扫描不能识别所有可能形式的秘密，提交自定义文件前仍应检查其内容。
 
 </details>
 
@@ -121,13 +173,13 @@ python scripts/release_privacy.py Release/NaiWaChatPet-Source-v2.0.1.zip
 
 ```text
 README.md                 使用说明（当前文件）
-CHANGELOG.md              V2.0.1 更新说明
+CHANGELOG.md              V2.1.0 更新说明
 LICENSE / NOTICE.md       GPL 与第三方声明
-Source/NaiWaChatPet/       奶蛙 Go 源码、资源、随附依赖
+Source/NaiWaChatPet/       奶蛙 Go 源码、动画、技能骨骼数据
 Source/DeskBox-1.5.8/      修改后的整理引擎完整源码、Rust 模块
 scripts/                  构建、打包、隐私检查
 installer/                Inno Setup 安装定义
-docs/                     测试报告、发布检查表
+docs/                     格斗网络、骨骼、测试报告与更新记录
 ```
 
 ### 工具链
@@ -140,21 +192,24 @@ docs/                     测试报告、发布检查表
 - Inno Setup 6，用于安装包。
 
 ```powershell
-# 在源码包根目录；将 ISCC 路径替换为本机安装位置
-powershell -NoProfile -ExecutionPolicy Bypass -File scripts/build.ps1 `
-  -IsccPath 'C:\Program Files (x86)\Inno Setup 6\ISCC.exe'
+# 只构建奶蛙与格斗服务端（Go 1.27）
+powershell -NoProfile -ExecutionPolicy Bypass -File scripts/BUILD_FIGHT.ps1
+
+# 安装包（需先准备 Release/NaiWaChatPet-v2.1.0 运行目录）
+ISCC.exe installer\NaiWaChatPet.iss
 ```
 
-该命令从源码构建奶蛙 GUI 程序和自带运行库的 Native AOT 整理引擎，再生成运行目录、对应源码包、安装包与 SHA256 清单。已有同名发布目录时拒绝覆盖；请先归档旧产物或更新版本标签。
+`BUILD_FIGHT.ps1` 会运行 Go 测试、构建 `NaiWaChatPet.exe` 与 `NaiWaFightServer.exe`，并复制动画与 `combat.json`。整理引擎使用既有 r13 模块，重建方式见下方分步命令。
 
 <details>
 <summary><strong>分步构建与必要测试</strong></summary>
 
 ```powershell
-# 奶蛙逻辑与搬运流程
+# 奶蛙逻辑与战斗回归
 Push-Location Source/NaiWaChatPet/source
-go test ./cmd/codexpet ./aiorganization ./tidy ./organizer ./companion
-go build -trimpath -ldflags '-H=windowsgui' -o ../../../build/NaiWaChatPet.exe ./cmd/codexpet
+go test ./...
+go build -buildvcs=false -trimpath -ldflags '-s -w -H windowsgui' -o ../../../build/NaiWaChatPet.exe ./cmd/codexpet
+go build -buildvcs=false -trimpath -o ../../../build/NaiWaFightServer.exe ./cmd/fightserver
 Pop-Location
 
 # 整理引擎：完整 Native AOT 构建，不复用外部旧二进制
@@ -167,9 +222,7 @@ Pop-Location
 python scripts/test_release_privacy.py
 ```
 
-上游已退出产品的功能仍有历史测试文件，当前验收使用 `NaiWaOrganizerCoreTests=true`，不声称完整上游测试套件通过。详细实测范围和未覆盖场景见 [测试报告](docs/TEST-REPORT.md)。
-
-普通 Debug 调试入口为 `Source/DeskBox-1.5.8/src/DeskBox/bin/Debug/net10.0-windows10.0.22621.0/DeskBox.exe`。先关闭同名进程再编译；以新 DLL 时间戳确认写入，避免误用旧版。正式使用仍从奶蛙入口启动。
+格斗模式的测试范围、网络限制和未覆盖场景见 [docs/FIGHT-TEST-REPORT.md](docs/FIGHT-TEST-REPORT.md)。上游已退出产品的功能仍有历史测试文件，当前验收使用 `NaiWaOrganizerCoreTests=true`，不声称完整上游测试套件通过。
 
 </details>
 
@@ -185,7 +238,21 @@ python scripts/test_release_privacy.py
 <details>
 <summary>为什么奶蛙不搬运，或者只搬一次？</summary>
 
-先检查动画选项。“无动画”不搬运，“简易动画”只展示一趟。完整动画若中断，查看整理提示；先退出旧版本，确认当前启动目录含 V2.0.1 的 `Organizer`。宠物忙碌时会重试，连接失效或超时会报告跳过情况。
+先检查动画选项。“无动画”不搬运，“简易动画”只展示一趟。完整动画若中断，查看整理提示；先退出旧版本，确认当前启动目录含 V2.1.0 的 `Organizer`。宠物忙碌时会重试，连接失效或超时会报告跳过情况。
+
+</details>
+
+<details>
+<summary>联机大厅搜不到房间怎么办？</summary>
+
+确认双方在同一局域网、使用同一版本客户端，并允许奶蛙访问专用网络。先点刷新；仍看不到时用 6 位房间码加入。部分热点、VPN、防火墙或设备隔离会阻止发现，可改用有线网络或关闭隔离后再试。
+
+</details>
+
+<details>
+<summary>为什么格斗里 L 闪避没有正式动作？</summary>
+
+L 的位移、无敌、零冷却和反馈已实现，但正式闪避骨骼资源尚未提供，当前是调试表现；接入新骨骼后无需改战斗规则。
 
 </details>
 
@@ -197,19 +264,18 @@ python scripts/test_release_privacy.py
 </details>
 
 <details>
-<summary>AI 没有改变分类怎么办？</summary>
-
-确认模型服务连接正常、已经同意发送名称并勾选项目，而且执行了智能分组并应用到预览。仅选择“AI”并不会自动授权上传或执行文件移动。可以加入明确用途描述，检查历史本地规则和模型返回提示。
-
-</details>
-
-<details>
 <summary>撤销遇到权限或同名冲突怎么办？</summary>
 
 保留原存放目录及整理历史，依据界面提示授权或重试。公用桌面可能需要 Windows 权限；不要以清空配置代替撤销。恢复必须以记录中的每项原路径为准。
 
 </details>
 
+## 上传 GitHub
+
+把源码 ZIP 解压后的内容提交到仓库根目录，README 会自动显示目录跳转、可折叠说明和操作表格。安装包、源码 ZIP 与 `SHA256SUMS.txt` 放在同一 **GitHub Release**，不要把二进制包提交进 Git。
+
+本交付只准备本地文件，不会自动替你创建仓库、上传或发布。
+
 ## 许可证与来源
 
-整理引擎基于 DeskBox v1.5.8，项目来源https://github.com/Tianyu199509/DeskBox 保留 [GPL-3.0 许可证全文](LICENSE) 与源代码中的版权声明。本仓库是奶蛙集成修改版，不是 DeskBox 官方发行版。分发二进制时应同时提供本版本对应源码、构建脚本和许可证。第三方依赖保留各自许可证，见 [NOTICE.md](NOTICE.md)。
+整理引擎基于 DeskBox v1.5.8，保留 [GPL-3.0 许可证全文](LICENSE) 与源代码中的版权声明。本仓库是奶蛙集成修改版，不是 DeskBox 官方发行版。分发二进制时应同时提供本版本对应源码、构建脚本和许可证。第三方依赖保留各自许可证，见 [NOTICE.md](NOTICE.md)。

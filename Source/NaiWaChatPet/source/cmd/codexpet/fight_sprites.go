@@ -177,11 +177,11 @@ func hudSprite(w int, pet, petTrail, foe, foeTrail float64, clock, round int, fo
 	digits, dw, dh := bannerSprite(strconv.Itoa(clock), dot, goldBanner, 1)
 	p.blit(digits, dw, dh, int(mid)-dw/2, dot*5)
 	small := max(1, dot/2)
-	label, lw, lh := textSprite("NAIWA", small*2, false, 1)
+	label, lw, lh := textSprite("NAIWA", small, false, 1)
 	p.blit(label, lw, lh, int(margin), int(barTop)-lh-dot/2)
-	label, lw, lh = textSprite(foeTag, small*2, false, 1)
+	label, lw, lh = textSprite(foeTag, small, false, 1)
 	p.blit(label, lw, lh, w-int(margin)-lw, int(barTop)-lh-dot/2)
-	label, lw, lh = textSprite("R"+strconv.Itoa(round), small*2, true, 1)
+	label, lw, lh = textSprite("R"+strconv.Itoa(round), small, true, 1)
 	p.blit(label, lw, lh, int(mid)-lw/2, int(barTop+barH)+dot*2)
 	return p.bgra(), h
 }
@@ -300,20 +300,24 @@ func holdWeapon(body *image.NRGBA, id string, x, y, angle float64) {
 	if _, ok := weaponArt[id]; !ok {
 		return
 	}
-	const reach = 170
+	scale := float64(body.Rect.Dx()) / 420
+	x *= scale
+	y *= scale
+	reach := int(math.Ceil(170 * scale))
 	x0, y0 := max(0, int(x)-reach), max(0, int(y)-reach)
 	x1, y1 := min(body.Rect.Dx(), int(x)+reach), min(body.Rect.Dy(), int(y)+reach)
 	if x1 <= x0 || y1 <= y0 {
 		return
 	}
 	p := newPainter(x1-x0, y1-y0)
-	paintWeapon(p, id, x-float64(x0), y-float64(y0), angle, 1)
+	paintWeapon(p, id, x-float64(x0), y-float64(y0), angle, scale)
 	p.onto(body, x0, y0)
 }
 
 // onto lays the painter over a straight-alpha frame with its top left at
 // (x0, y0).
 func (p *painter) onto(body *image.NRGBA, x0, y0 int) {
+	defer p.recycle()
 	for j := 0; j < p.h; j++ {
 		for i := 0; i < p.w; i++ {
 			s := (j*p.w + i) * 4

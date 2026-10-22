@@ -122,7 +122,7 @@ func TestClassifierContextsPersonaAndConfidenceSeparate(t *testing.T) {
 		classifierEnvelope(w, `{"emotion":"happy","intensity":0.2,"confidence":0.99,"duration_ms":5000}`)
 	}, 1)
 	defer api.Close()
-	m := ClassifyPetEmotion(context.Background(), c, "sk-test-emotion", "deepseek-flash", "deepseek", "id", "now", []Message{{Role: "user", Content: "earlier"}}, "sad", time.Second)
+	m := ClassifyPetEmotion(context.Background(), c, "test-credential-emotion", "deepseek-flash", "deepseek", "id", "now", []Message{{Role: "user", Content: "earlier"}}, "sad", time.Second)
 	if m.Effective.Intensity != .2 || m.Effective.Confidence != .99 {
 		t.Fatal(fmt.Sprint(m))
 	}

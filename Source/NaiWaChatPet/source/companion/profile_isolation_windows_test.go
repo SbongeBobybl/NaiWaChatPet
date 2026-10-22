@@ -16,7 +16,7 @@ func TestReleaseProfileDoesNotImportLegacyPrivateState(t *testing.T) {
     }
     current, err := ProfileDirectory()
     if err != nil { t.Fatal(err) }
-    if current == legacy || filepath.Base(current) != "2.0.1" { t.Fatal("release reused legacy profile") }
+    if current == legacy || filepath.Base(current) != "2.1.0" { t.Fatal("release reused legacy profile") }
     if p := readPreferences(); p.Persona != "" { t.Fatal("legacy preferences imported") }
     if _, err := os.Stat(current); !os.IsNotExist(err) { t.Fatal("profile reads must not import files") }
     if _, err := os.Stat(filepath.Join(legacy,"companion-memory.dpapi")); err != nil { t.Fatal("legacy data was deleted") }

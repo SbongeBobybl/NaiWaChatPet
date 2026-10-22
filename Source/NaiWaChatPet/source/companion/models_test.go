@@ -51,7 +51,7 @@ func TestNonStreamingAndThinkingConfiguration(t *testing.T) {
 		w.Write([]byte(normalReply))
 	}, 1)
 	defer api.Close()
-	_, e := c.Complete(context.Background(), "sk-test-config", RequestOptions{Model: "deepseek-flash", Thinking: true, MaxTokens: 8192}, []Message{{Role: "user", Content: "test"}}, nil)
+	_, e := c.Complete(context.Background(), "test-credential-config", RequestOptions{Model: "deepseek-flash", Thinking: true, MaxTokens: 8192}, []Message{{Role: "user", Content: "test"}}, nil)
 	if e != nil {
 		t.Fatal(e)
 	}

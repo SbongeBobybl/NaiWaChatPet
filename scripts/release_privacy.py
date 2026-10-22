@@ -2,7 +2,7 @@
 from pathlib import Path
 import json, re, zipfile
 
-PRIVATE_PARTS = {'private-config', 'deskbox-agent', 'chat-history', 'user-data', '.env', '.aws', 'logs', '.codex', '.agents', '__pycache__'}
+PRIVATE_PARTS = {'private-config', 'deskbox-agent', 'chat-history', 'user-data', '.env', '.aws', 'logs', 'receivedfiles', 'demo_logs', '.codex', '.agents', '__pycache__'}
 PRIVATE_NAMES = {'companion-prefs.json', 'companion-preferences.json', 'companion-memory.dpapi.tmp', 'companion-memory.dpapi', 'agent.json', 'settings.json', 'chat-history.json', 'cookies', 'credentials.json', 'play.json', 'requests.jsonl', 'recovery.json', 'vcvars-env.txt'}
 SECRET = re.compile(rb'(?:(?<![A-Za-z0-9_-])sk-[A-Za-z0-9_-]{20,160}(?![A-Za-z0-9_-])|-----BEGIN (?:RSA |EC |OPENSSH )?PRIVATE KEY-----)')
 FIELDS = {'apikey', 'api_key', 'access_token', 'refresh_token', 'secretkey', 'password'}
